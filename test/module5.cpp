@@ -1,201 +1,320 @@
 ﻿#include <QApplication>
-#include <QWidget>
-#include <QListWidget>
-#include <QLabel>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QPainter>
+#include <QAbstractScrollArea>
+#include <QScrollArea>
+#include <QScrollBar>
+#include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
-#include <QPushButton>
+#include <QEvent>
+#include <QWidget>
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QFrame>
 #include <QDebug>
+#include <QtGlobal>
 
-// --------------------- SidebarItemWidget ---------------------
-class SidebarItemWidget : public QWidget
+/**
+ * @brief 前台显示用的幽灵滚动条。
+ */
+class ghost_overlay_scroll_bar : public QScrollBar
 {
-    Q_OBJECT
-    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
 public:
-    SidebarItemWidget(const QIcon &icon, const QString &text, QWidget *parent = nullptr)
-        : QWidget(parent)
-    {
-        m_iconLabel = new QLabel;
-        m_iconLabel->setPixmap(icon.pixmap(20,20));
-        m_textLabel = new QLabel(text);
+    static constexpr int bar_width = 20;
+    static constexpr int bar_margin = 3;
+    static constexpr int handle_min_height = 36;
+    static constexpr int border_radius = 6;
+    static constexpr int fade_duration_ms = 160;
 
-        auto* layout = new QHBoxLayout(this);
-        layout->setContentsMargins(12,0,12,0);
-        layout->setSpacing(10);
-        layout->addWidget(m_iconLabel);
-        layout->addWidget(m_textLabel);
-        layout->addStretch();
-
-        m_normalColor = QColor(30,30,30);
-        m_hoverColor  = QColor(60,60,60);
-        m_bgColor     = m_normalColor;
-
-        m_hoverAnim = new QPropertyAnimation(this, "backgroundColor");
-        m_hoverAnim->setDuration(120);
-        m_hoverAnim->setEasingCurve(QEasingCurve::InOutCubic);
-
-        m_textLabel->setStyleSheet("color:#dcdcdc; font-size:14px; font-family:Segoe UI;");
-    }
-
-    void setSelected(bool selected)
-    {
-        m_selected = selected;
-        m_hoverAnim->stop();
-        m_bgColor = selected ? m_hoverColor : m_normalColor;
-        update();
-    }
-
-    QColor backgroundColor() const { return m_bgColor; }
-    void setBackgroundColor(const QColor &color)
-    {
-        m_bgColor = color;
-        update();
-    }
-
-    void setTheme(const QColor &normal, const QColor &hover, const QColor &text)
-    {
-        m_normalColor = normal;
-        m_hoverColor = hover;
-        m_textLabel->setStyleSheet(QString("color:%1; font-size:14px; font-family:Segoe UI;")
-                                   .arg(text.name()));
-        m_bgColor = m_normalColor;
-        update();
-    }
-
-protected:
-    void enterEvent(QEvent *event) override
-    {
-        if(!m_selected)
-        {
-            m_hoverAnim->stop();
-            m_hoverAnim->setEndValue(m_hoverColor);
-            m_hoverAnim->start();
-        }
-        QWidget::enterEvent(event);
-    }
-
-    void leaveEvent(QEvent *event) override
-    {
-        if(!m_selected)
-        {
-            m_hoverAnim->stop();
-            m_hoverAnim->setEndValue(m_normalColor);
-            m_hoverAnim->start();
-        }
-        QWidget::leaveEvent(event);
-    }
-
-    void paintEvent(QPaintEvent *event) override
-    {
-        QPainter p(this);
-        p.setRenderHint(QPainter::Antialiasing);
-        p.fillRect(rect(), m_bgColor);
-        QWidget::paintEvent(event);
-    }
-
-private:
-    QLabel *m_iconLabel;
-    QLabel *m_textLabel;
-    QColor m_bgColor;
-    QColor m_hoverColor;
-    QColor m_normalColor;
-    QPropertyAnimation *m_hoverAnim;
-    bool m_selected = false;
-};
-
-// --------------------- MainWindow ---------------------
-class MainWindow : public QWidget
-{
-    Q_OBJECT
 public:
-    MainWindow(QWidget* parent = nullptr)
-        : QWidget(parent)
+    explicit ghost_overlay_scroll_bar(Qt::Orientation orientation, QWidget* parent = nullptr)
+        : QScrollBar(orientation, parent)
+        , m_opacity_effect(new QGraphicsOpacityEffect(this))
+        , m_fade_animation(new QPropertyAnimation(m_opacity_effect, "opacity", this))
     {
-        resize(400, 400);
+        setGraphicsEffect(m_opacity_effect);
+        m_opacity_effect->setOpacity(0.0);
 
-        sidebar = new QListWidget(this);
-        sidebar->setViewMode(QListView::ListMode);
-        sidebar->setFlow(QListView::TopToBottom);
-        sidebar->setMovement(QListView::Static);
-        sidebar->setSpacing(2);
-        sidebar->setFixedWidth(180);
-        sidebar->setSelectionMode(QAbstractItemView::SingleSelection);
-        sidebar->setFrameShape(QFrame::NoFrame);
-        sidebar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        sidebar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        m_fade_animation->setDuration(fade_duration_ms);
 
-        auto addItem = [&](const QString &text, const QIcon &icon)
-        {
-            auto* item = new QListWidgetItem(sidebar);
-            item->setSizeHint(QSize(160, 40));
-            auto* widget = new SidebarItemWidget(icon, text);
-            sidebar->addItem(item);
-            sidebar->setItemWidget(item, widget);
-        };
-
-        addItem("主页",   QIcon("D:/c++/Qt/Qt5/dong_dong_widgets/node_editor/resources/main.svg"));
-        addItem("时钟",   QIcon("D:/c++/Qt/Qt5/dong_dong_widgets/node_editor/resources/clock.svg"));
-
-        // 选中处理
-        connect(sidebar, &QListWidget::currentRowChanged, this, [&](int row){
-            for(int i=0; i<sidebar->count(); ++i)
-            {
-                auto *widget = qobject_cast<SidebarItemWidget*>(sidebar->itemWidget(sidebar->item(i)));
-                if(widget) widget->setSelected(i == row);
+        connect(m_fade_animation, &QPropertyAnimation::finished, this, [this]() {
+            if (m_target_opacity <= 0.0) {
+                hide();
             }
         });
 
-        // 初始选中第一项
-        sidebar->setCurrentRow(0);
+        setMouseTracking(true);
+        hide();
 
-        // 主布局
-        auto* layout = new QHBoxLayout(this);
-        layout->setContentsMargins(0,0,0,0);
-        layout->addWidget(sidebar);
-        layout->addStretch();
-
-        // 默认深色主题
-        applyTheme(true);
+        apply_style();
     }
 
-    void applyTheme(bool dark)
+    void fade_to(qreal opacity)
     {
-        if(dark)
-        {
-            sidebar->setStyleSheet("QListWidget{background:#1e1e1e;}");
-            for(int i=0;i<sidebar->count();++i)
-            {
-                auto *w = qobject_cast<SidebarItemWidget*>(sidebar->itemWidget(sidebar->item(i)));
-                if(w) w->setTheme(QColor(30,30,30), QColor(60,60,60), QColor(220,220,220));
-            }
+        m_target_opacity = opacity;
+
+        if (opacity > 0.0 && !isVisible()) {
+            show();
         }
-        else
-        {
-            sidebar->setStyleSheet("QListWidget{background:#f0f0f0;}");
-            for(int i=0;i<sidebar->count();++i)
-            {
-                auto *w = qobject_cast<SidebarItemWidget*>(sidebar->itemWidget(sidebar->item(i)));
-                if(w) w->setTheme(QColor(240,240,240), QColor(200,200,200), QColor(30,30,30));
-            }
-        }
+
+        m_fade_animation->stop();
+        m_fade_animation->setStartValue(m_opacity_effect->opacity());
+        m_fade_animation->setEndValue(opacity);
+        m_fade_animation->start();
     }
 
 private:
-    QListWidget* sidebar;
+    void apply_style()
+    {
+        setStyleSheet(QString(R"(
+        QScrollBar:vertical {
+            background: rgba(120, 120, 120, 55);
+            width: %1px;
+            margin: %2px;
+            border: none;
+            border-radius: %3px;
+        }
+
+        QScrollBar::handle:vertical {
+            background: rgba(90, 90, 90, 190);
+            min-height: %4px;
+            border-radius: %5px;
+            margin: 2px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: rgba(70, 70, 70, 220);
+        }
+
+        QScrollBar::add-page:vertical,
+        QScrollBar::sub-page:vertical {
+            background: transparent;
+            border: none;
+        }
+
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {
+            background: transparent;
+            height: 0px;
+            border: none;
+        }
+    )")
+        .arg(bar_width)
+        .arg(bar_margin)
+        .arg(border_radius)
+        .arg(handle_min_height)
+        .arg(border_radius - 2));
+    }
+
+private:
+    QGraphicsOpacityEffect* m_opacity_effect = nullptr;
+    QPropertyAnimation* m_fade_animation = nullptr;
+    qreal m_target_opacity = 0.0;
 };
 
-// --------------------- main ---------------------
-int main(int argc, char** argv)
+/**
+ * @brief 最简版幽灵滚动条控制器。
+ */
+class ghost_scroll_controller : public QObject
+{
+public:
+    explicit ghost_scroll_controller(QAbstractScrollArea* area)
+        : QObject(area)
+        , m_area(area)
+        , m_real_bar(area->verticalScrollBar())
+        , m_fake_bar(new ghost_overlay_scroll_bar(Qt::Vertical, area->viewport()))
+    {
+        Q_ASSERT(m_area);
+        Q_ASSERT(m_real_bar);
+        Q_ASSERT(m_fake_bar);
+
+        // 隐藏真实滚动条，避免内容区尺寸跳动
+        m_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+        // 让 viewport 和假滚动条都能把事件先交给控制器
+        m_area->viewport()->setMouseTracking(true);
+        m_fake_bar->setMouseTracking(true);
+        m_area->viewport()->installEventFilter(this);
+        m_fake_bar->installEventFilter(this);
+
+        // 真实滚动条变化 -> 同步给假滚动条
+        connect(m_real_bar, &QScrollBar::valueChanged, this, [this]() {
+            sync_bar();
+        });
+
+        connect(m_real_bar, &QScrollBar::rangeChanged, this, [this]() {
+            sync_bar();
+        });
+
+        // 假滚动条变化 -> 写回真实滚动条
+        connect(m_fake_bar, &QScrollBar::valueChanged, this, [this](int value) {
+            if (m_real_bar->value() != value) {
+                m_real_bar->setValue(value);
+            }
+        });
+
+        sync_bar();
+    }
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (watched == m_area->viewport()) {
+            switch (event->type()) {
+            case QEvent::Enter:
+            case QEvent::MouseMove:
+            case QEvent::Wheel:
+            {
+                if (m_real_bar->maximum() > m_real_bar->minimum()) {
+                    QWidget* vp = m_area->viewport();
+
+                    m_fake_bar->setGeometry(
+                        vp->width() - ghost_overlay_scroll_bar::bar_width - ghost_overlay_scroll_bar::bar_margin,
+                        ghost_overlay_scroll_bar::bar_margin,
+                        ghost_overlay_scroll_bar::bar_width,
+                        vp->height() - ghost_overlay_scroll_bar::bar_margin * 2
+                    );
+
+                    m_fake_bar->raise();
+                    m_fake_bar->fade_to(0.95);
+                }
+                break;
+            }
+
+            case QEvent::Resize:
+            {
+                QWidget* vp = m_area->viewport();
+
+                m_fake_bar->setGeometry(
+                    vp->width() - ghost_overlay_scroll_bar::bar_width - ghost_overlay_scroll_bar::bar_margin,
+                    ghost_overlay_scroll_bar::bar_margin,
+                    ghost_overlay_scroll_bar::bar_width,
+                    vp->height() - ghost_overlay_scroll_bar::bar_margin * 2
+                );
+
+                m_fake_bar->raise();
+                break;
+            }
+
+            case QEvent::Leave:
+            {
+                if (!m_fake_bar->underMouse()) {
+                    m_fake_bar->fade_to(0.0);
+                }
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+
+        if (watched == m_fake_bar) {
+            switch (event->type()) {
+            case QEvent::Enter:
+            {
+                if (m_real_bar->maximum() > m_real_bar->minimum()) {
+                    QWidget* vp = m_area->viewport();
+
+                    m_fake_bar->setGeometry(
+                        vp->width() - ghost_overlay_scroll_bar::bar_width - ghost_overlay_scroll_bar::bar_margin,
+                        ghost_overlay_scroll_bar::bar_margin,
+                        ghost_overlay_scroll_bar::bar_width,
+                        vp->height() - ghost_overlay_scroll_bar::bar_margin * 2
+                    );
+
+                    m_fake_bar->raise();
+                    m_fake_bar->fade_to(0.95);
+                }
+                break;
+            }
+
+            case QEvent::Leave:
+            {
+                if (!m_area->viewport()->underMouse()) {
+                    m_fake_bar->fade_to(0.0);
+                }
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    void sync_bar()
+    {
+        if (m_real_bar->maximum() <= m_real_bar->minimum()) {
+            m_fake_bar->hide();
+            return;
+        }
+
+        m_fake_bar->setRange(m_real_bar->minimum(), m_real_bar->maximum());
+        m_fake_bar->setPageStep(m_real_bar->pageStep());
+        m_fake_bar->setSingleStep(m_real_bar->singleStep());
+
+        if (m_fake_bar->value() != m_real_bar->value()) {
+            m_fake_bar->setValue(m_real_bar->value());
+        }
+
+        QWidget* vp = m_area->viewport();
+
+        m_fake_bar->setGeometry(
+            vp->width() - ghost_overlay_scroll_bar::bar_width - ghost_overlay_scroll_bar::bar_margin,
+            ghost_overlay_scroll_bar::bar_margin,
+            ghost_overlay_scroll_bar::bar_width,
+            vp->height() - ghost_overlay_scroll_bar::bar_margin * 2
+        );
+
+        m_fake_bar->raise();
+    }
+
+private:
+    QAbstractScrollArea* m_area = nullptr;
+    QScrollBar* m_real_bar = nullptr;
+    ghost_overlay_scroll_bar* m_fake_bar = nullptr;
+};
+
+int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    MainWindow w;
-    w.show();
+    // 构造一个很长的内容区域，确保可以滚动
+    auto* content = new QWidget;
+    auto* layout = new QVBoxLayout(content);
+    layout->setSpacing(8);
+    layout->setContentsMargins(12, 12, 12, 12);
 
+    for (int i = 0; i < 80; ++i) {
+        auto* item = new QFrame;
+        item->setFrameShape(QFrame::StyledPanel);
+        item->setStyleSheet(R"(
+            QFrame {
+                background: white;
+                border: 1px solid #d0d0d0;
+                border-radius: 6px;
+            }
+        )");
+
+        auto* item_layout = new QVBoxLayout(item);
+        item_layout->addWidget(new QLabel(QString("测试项 %1").arg(i + 1)));
+        item_layout->addWidget(new QLabel("把鼠标移入内容区，右侧应出现幽灵滚动条。"));
+        layout->addWidget(item);
+    }
+
+    layout->addStretch();
+
+    auto* area = new QScrollArea;
+    area->setWidgetResizable(true);
+    area->setWidget(content);
+    area->resize(520, 420);
+    area->setWindowTitle("ghost_scroll_controller 测试");
+
+    // 挂上代理滚动条
+    new ghost_scroll_controller(area);
+
+    area->show();
     return app.exec();
 }
-
-#include "module5.moc"

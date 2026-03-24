@@ -1,0 +1,9 @@
+﻿<!DOCTYPE RCC>
+<RCC version="1.0">
+
+    <!-- 包含图标资源 -->
+    <qresource prefix="/icons">
+        <file>icons/checkbox_checked.png</file>
+        <file>icons/checkbox_unchecked.png</file>
+    </qresource>
+</RCC>

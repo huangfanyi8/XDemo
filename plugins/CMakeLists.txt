@@ -1,20 +1,37 @@
-project(node_plugin)
-
-# 包含插件入口和之前的编辑器逻辑
-set(PLUGIN_SOURCES
-        _plugin.h
-        _plugin.cpp
-        ${CMAKE_SOURCE_DIR}/include/NodeEditor.cpp
-        ${CMAKE_SOURCE_DIR}/include/NodeEditor.h
+﻿add_library( ButtonV1 SHARED Button/ButtonV1.cpp)
+add_library( ButtonV2 SHARED Button/ButtonV2.cpp)
+# 链接 Qt5 模块
+target_link_libraries(ButtonV1
+        Qt5::Core
+        Qt5::Widgets
+        Qt5::UiPlugin
+)
+# 链接 Qt5 模块
+target_link_libraries(ButtonV2
+        Qt5::Core
+        Qt5::Widgets
+        Qt5::UiPlugin
+)
+message(${CMAKE_SOURCE_DIR}/bin/plugins)
+# 设置输出目录到 bin/plugins，并将导入库输出到临时目录
+set_target_properties(ButtonV1 PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/plugins   # Windows DLL
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/plugins   # Linux .so / macOS .dylib
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build_temp      # 将 .lib 输出到临时目录
 )
 
-# [核心] 以模块方式创建库
-add_library(node_editor_plugin MODULE ${PLUGIN_SOURCES})
-
-# 链接 Qt 窗口库
-target_link_libraries(node_editor_plugin PRIVATE Qt5::Widgets)
-
-# 自动部署：将生成的插件存放到主程序的 plugins 目录下
-set_target_properties(node_editor_plugin PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
+set_target_properties(ButtonV2 PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/plugins   # Windows DLL
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/plugins   # Linux .so / macOS .dylib
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build_temp      # 将 .lib 输出到临时目录
 )
+
+# Windows 平台：不生成导入库（.lib 和 .exp）
+if(WIN32)
+    set_target_properties(ButtonV1 PROPERTIES
+        LINK_FLAGS "/IMPLIB:NUL"
+    )
+    set_target_properties(ButtonV2 PROPERTIES
+        LINK_FLAGS "/IMPLIB:NUL"
+    )
+endif()

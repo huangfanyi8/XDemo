@@ -12,13 +12,18 @@
 #include <QTabBar>
 
 // --- 1. 自定义标签栏：处理动画与核心绘图 ---
-class QuarkTabBar : public QTabBar {
+class EdgeTabBar
+    : public QTabBar
+ {
     Q_OBJECT
 public:
-    explicit QuarkTabBar(QWidget *parent = nullptr) : QTabBar(parent) {
+    explicit EdgeTabBar(QWidget *parent = nullptr)
+        : QTabBar(parent)
+    {
+        //允许标签关闭
         this->setTabsClosable(true);
         this->setMovable(true); // 开启拖拽
-        // 关键：设置 Fixed 策略，否则动画会被布局拉伸挤压
+        // 设置 Fixed 策略，否则动画会被布局拉伸挤压
         this->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     }
 
@@ -164,11 +169,15 @@ protected:
     }
 };
 
-// --- 2. 容器组件：协调 TabBar 与 StackedWidget ---
-class QuarkTabWidget : public QWidget {
+// 容器组件：协调 TabBar 与 StackedWidget
+class EdgeTabWidget
+    : public QWidget
+{
     Q_OBJECT
 public:
-    explicit QuarkTabWidget(QWidget *parent = nullptr) : QWidget(parent) {
+    explicit EdgeTabWidget(QWidget *parent = nullptr)
+        : QWidget(parent)
+    {
         this->resize(1000, 800);
         auto *layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
@@ -182,7 +191,7 @@ public:
         _top_layout->setContentsMargins(15, 4, 15, 0);
         _top_layout->setSpacing(0);
 
-        _tab_bar = new QuarkTabBar;
+        _tab_bar = new EdgeTabBar;
         _add_button = new QPushButton("+");
         _add_button->setFixedSize(65, 65);
         _add_button->setStyleSheet("QPushButton { border: none; font-size: 22px; color: #777; }"
@@ -201,8 +210,8 @@ public:
         connect(_tab_bar, &QTabBar::currentChanged, _stack, &QStackedWidget::setCurrentIndex);
 
         // 删除逻辑：先动效，后物理删除内容
-        connect(_tab_bar, &QTabBar::tabCloseRequested, _tab_bar, &QuarkTabBar::removeTabWithAnim);
-        connect(_tab_bar, &QuarkTabBar::tabRemovedSync, [this](int index) {
+        connect(_tab_bar, &QTabBar::tabCloseRequested, _tab_bar, &EdgeTabBar::removeTabWithAnim);
+        connect(_tab_bar, &EdgeTabBar::tabRemovedSync, [this](int index) {
             QWidget *w = _stack->widget(index);
             if (w) {
                 _stack->removeWidget(w);
@@ -220,7 +229,7 @@ public:
     }
 
 private:
-    QuarkTabBar *_tab_bar;
+    EdgeTabBar *_tab_bar;
     QStackedWidget *_stack;
     QPushButton *_add_button;
 };
@@ -231,7 +240,7 @@ int main(int argc, char *argv[]) {
 
     QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
     QApplication a(argc, argv);
-    QuarkTabWidget w;
+    EdgeTabWidget w;
     w.show();
     return a.exec();
 }

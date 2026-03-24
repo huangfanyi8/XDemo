@@ -1,0 +1,6 @@
+﻿{
+  "name": "Button Switch",
+  "version": "1.0.0",
+  "history": ["0.9.0", "0.8.0"],
+  "description": "A simple toggle button"
+}

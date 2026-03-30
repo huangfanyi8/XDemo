@@ -358,10 +358,10 @@ private:
  * 左侧：组件箱
  * 右侧：设计画布
  */
-class MainWindow : public QMainWindow
+class PluginBuilder : public QMainWindow
 {
 public:
-    explicit MainWindow(QWidget* parent = nullptr)
+    explicit PluginBuilder(QWidget* parent = nullptr)
         : QMainWindow(parent)
     {
         auto* central = new QWidget(this);
@@ -444,7 +444,7 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    MainWindow window;
+    PluginBuilder window;
     window.show();
 
     return app.exec();

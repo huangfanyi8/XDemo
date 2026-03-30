@@ -1,0 +1,19 @@
+cmake_minimum_required(VERSION 3.16)
+project({{plugin_name}} LANGUAGES CXX)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_PREFIX_PATH "{{qt_path}}")
+
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets)
+
+# 搜集源码
+file(GLOB_RECURSE USER_FILES "{{source_dir}}/*.cpp" "{{source_dir}}/*.h")
+
+# 必须生成与包含名一致的 .cpp 文件
+add_library({{plugin_name}} SHARED ${USER_FILES} "plugin_wrapper.cpp")
+target_link_libraries({{plugin_name}} PRIVATE Qt5::Core Qt5::Widgets)
+
+set_target_properties({{plugin_name}} PROPERTIES
+    OUTPUT_NAME "{{plugin_name}}_{{version}}"
+    PREFIX ""
+)

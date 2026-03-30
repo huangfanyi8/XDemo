@@ -6,4 +6,10 @@
         <file>icons/checkbox_checked.png</file>
         <file>icons/checkbox_unchecked.png</file>
     </qresource>
+
+    <!-- 包含模板文件 -->
+    <qresource prefix="/templates">
+        <file>../test/templates/cmake.mustache</file>
+        <file>../test/templates/wrapper.mustache</file>
+    </qresource>
 </RCC>

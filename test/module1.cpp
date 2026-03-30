@@ -8,11 +8,11 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-class MainWindow : public QMainWindow
+class PluginBuilder : public QMainWindow
 {
     Q_OBJECT
 public:
-    MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
+    PluginBuilder(QWidget *parent = nullptr) : QMainWindow(parent)
     {
         // 1. 创建场景和视图
         QGraphicsScene *scene = new QGraphicsScene(this);
@@ -46,7 +46,7 @@ public:
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    MainWindow w;
+    PluginBuilder w;
     w.show();
     return a.exec();
 }

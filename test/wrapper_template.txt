@@ -1,0 +1,30 @@
+#include <QObject>
+#include <QtPlugin>
+
+// 接口基类,按需求调整
+class PluginInterfaceBase
+{
+public:
+    virtual ~PluginInterfaceBase () = default;
+    virtual QWidget*create_widget() = 0;
+};
+
+
+Q_DECLARE_INTERFACE(PluginInterfaceBase , "plugin")
+
+#include "{{class_name}}.h"
+
+class {{class_name}}Wrapper : public QObject, public PluginInterfaceBase
+{
+    Q_OBJECT
+    Q_INTERFACES(PluginInterfaceBase)
+    Q_PLUGIN_METADATA(IID "plugin")
+public:
+    QWidget*() override
+    {
+        return  new {{class_name}}();
+    }
+};
+
+// 必须与生成的 .cpp 文件名 plugin_wrapper 保持一致
+#include "plugin_wrapper.moc"

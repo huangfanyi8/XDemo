@@ -28,9 +28,13 @@ struct ParsedPluginMetadata
 
 QString normalize_plugin_id(const QString &value)
 {
+    // 去除首尾空格并转换为小写
     QString normalized = value.trimmed().toLower();
+    // 将所有非字母数字的连续字符替换为单个下划线
     normalized.replace(QRegularExpression("[^\\p{L}\\p{N}]+"), QStringLiteral("_"));
+    // 去除开头的下划线
     normalized.remove(QRegularExpression("^_+"));
+    // 去除结尾的下划线
     normalized.remove(QRegularExpression("_+$"));
 
     if (normalized.isEmpty())

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\C++\Qt5\XDemo\TestPlugin\build\MyWidget\build\CMakeFiles\fe9a52dad1ac70a93afc7ce395cb85b7\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{D17E6475-E027-3BFF-9A73-D035148CF1ED}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,3 @@
+D:/C++/Qt5/XDemo/TestPlugin/build/MyWidget/build/CMakeFiles/MyWidget.dir
+D:/C++/Qt5/XDemo/TestPlugin/build/MyWidget/build/CMakeFiles/ALL_BUILD.dir
+D:/C++/Qt5/XDemo/TestPlugin/build/MyWidget/build/CMakeFiles/ZERO_CHECK.dir

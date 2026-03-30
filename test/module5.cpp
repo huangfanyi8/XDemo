@@ -276,6 +276,48 @@ private:
     QScrollBar* m_real_bar = nullptr;
     ghost_overlay_scroll_bar* m_fake_bar = nullptr;
 };
+#include <QCoreApplication>
+#include <QDebug>
+#include <QDir>
+#include <QFileInfo>
+#include <QString>
+
+/**
+ * @brief 从指定起始目录开始，逐级向上查找 project_root.txt
+ *
+ * @param start_path 起始目录
+ * @return 找到的项目根目录；如果没找到则返回空字符串
+ */
+static QString find_project_root(const QString &start_path)
+{
+    QDir dir(start_path);
+
+    if (!dir.exists())
+    {
+        qDebug() << "Start path does not exist:" << QDir::toNativeSeparators(start_path);
+        return QString();
+    }
+
+    while (true)
+    {
+        const QString marker_file_path = dir.filePath("project_root.txt");
+
+        qDebug() << "Checking:" << QDir::toNativeSeparators(marker_file_path);
+
+        if (QFileInfo::exists(marker_file_path) && QFileInfo(marker_file_path).isFile())
+        {
+            return dir.absolutePath();
+        }
+
+        if (!dir.cdUp())
+        {
+            break;
+        }
+    }
+
+    return QString();
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -316,5 +358,21 @@ int main(int argc, char *argv[])
     new ghost_scroll_controller(area);
 
     area->show();
+
+    // 当前程序所在目录，比 QDir::currentPath() 更稳定
+    const QString app_dir = QCoreApplication::applicationDirPath();
+
+    qDebug() << "Application directory:" << QDir::toNativeSeparators(app_dir);
+
+    const QString project_root = find_project_root(app_dir);
+
+    if (project_root.isEmpty())
+    {
+        qDebug() << "Project root not found.";
+    }
+    else
+    {
+        qDebug() << "Project root found:" << QDir::toNativeSeparators(project_root);
+    }
     return app.exec();
 }

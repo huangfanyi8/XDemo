@@ -112,23 +112,17 @@ public:
     }
 };
 
-PathSelector::PathSelector(const Mode m, QWidget *parent)
-    : QWidget(parent), m_mode(m)
+PathSelector::PathSelector(QWidget *parent)
+    : QWidget(parent)
 {
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(0,0,0,0);
 
-    m_edit = new QLineEdit(this);
-    auto *select_button = new QPushButton("...", this);
+    edit = new QLineEdit(this);
+    browse = new QPushButton("...", this);
 
-    layout->addWidget(m_edit);
-    layout->addWidget(select_button);
-
-    connect(select_button, &QPushButton::clicked,this, [this]{
-                const auto  res = (m_mode == Directory)
-    ? QFileDialog::getExistingDirectory(this, "Select Directory")
-    : QFileDialog::getOpenFileName(this, "Select File");
-    if (!res.isEmpty())m_edit->setText(QDir::fromNativeSeparators(res));});
+    layout->addWidget(edit);
+    layout->addWidget(browse);
 }
 
 
@@ -138,6 +132,7 @@ PluginBuilderView::PluginBuilderView(QWidget *parent)
     setup_ui();
     setWindowTitle("PluginBuilder");
     resize(900, 650);
+    _connect_signals();
 }
 
 void PluginBuilderView::setup_ui()
@@ -145,9 +140,9 @@ void PluginBuilderView::setup_ui()
     auto *main_layout = new QVBoxLayout(this);
     auto *form = new QFormLayout();
 
-    m_path_source = new PathSelector(PathSelector::Directory);
-    m_path_cmake  = new PathSelector(PathSelector::File);
-    m_path_qt     = new PathSelector(PathSelector::Directory);
+    m_path_source = new PathSelector;
+    m_path_cmake  = new PathSelector;
+    m_path_qt     = new PathSelector;
 
     form->addRow("Source Directory:",   m_path_source);
     form->addRow("CMake Executable:", m_path_cmake);
@@ -176,35 +171,7 @@ void PluginBuilderView::setup_ui()
 
     main_layout->addWidget(m_clean_build);
 
-    connect(m_build,&QPushButton::clicked,this, [this]{
-        m_log_edit->clear();
-        m_progress->setValue(0);
-        m_open_dir->setEnabled(false);
 
-        if (execute_build(false))
-        {
-            m_open_dir->setEnabled(true);
-            QMessageBox::information(this, "Success", "Build finished!");
-            on_open_output_dir();
-        }
-        else
-            QMessageBox::critical(this, "Error", m_last_error);
-    });
-
-    connect(m_clean_build, &QPushButton::clicked, this, [this]{
-        m_log_edit->clear();
-        m_progress->setValue(0);
-        m_open_dir->setEnabled(false);
-
-        if (execute_build(true))
-        {
-            m_open_dir->setEnabled(true);
-            QMessageBox::information(this, "Success", "Clean rebuild finished!");
-            on_open_output_dir();
-        }
-        else
-            QMessageBox::critical(this, "Error", m_last_error);
-    });
 }
 
 
@@ -443,8 +410,8 @@ bool PluginBuilderView::run_process_with_msvc_environment(const QString &cmd,
 
 bool PluginBuilderView::execute_build(bool clean_first)
 {
-    // 1. Validate the three user inputs required to generate and build a plugin:
-    //    source directory, CMake executable, and Qt installation path.
+
+    //检查路径的有效性
     if (m_path_source->path().isEmpty()) {
         m_last_error = "Source Dir cannot be empty.";
         return false;
@@ -460,11 +427,10 @@ bool PluginBuilderView::execute_build(bool clean_first)
         return false;
     }
 
-    // 2. Normalize the text entered in the UI so all later file and process
-    //    operations use the same path format.
-    const QString source_dir = QDir::fromNativeSeparators(m_path_source->path());
-    const QString cmake_exe = QDir::fromNativeSeparators(m_path_cmake->path());
-    const QString qt_input_dir = QDir::fromNativeSeparators(m_path_qt->path());
+    // 获取路径信息.
+    const QString source_dir = m_path_source->path();
+    const QString cmake_exe = m_path_cmake->path();
+    const QString qt_input_dir = m_path_qt->path();
 
     auto has_qt5_package = [](const QString &dir) -> bool {
         return QFileInfo::exists(dir + "/Qt5Config.cmake");
@@ -733,12 +699,6 @@ void {{CLASS_NAME}}::setup_ui()
     append_log("Created: metadata.json");
 
     QString cmake_tpl = R"(cmake_minimum_required(VERSION 3.20)
-
-# 设置 Qt 路径（必须在 project 之前）
-list(APPEND CMAKE_PREFIX_PATH "{{qt_prefix_path}}")
-
-# Qt path can be provided by the builder or overridden by configure arguments.
-list(APPEND CMAKE_PREFIX_PATH "{{qt_prefix_path}}")
 
 project({{CLASS_NAME}} LANGUAGES CXX)
 

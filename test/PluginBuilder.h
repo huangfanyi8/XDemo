@@ -20,16 +20,38 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-class PathSelector : public QWidget
+struct PathSelector
+    :QWidget
 {
     Q_OBJECT
 public:
-    enum Mode { Directory, File };
-    explicit PathSelector(Mode m, QWidget *parent = nullptr);
-    QString path() const{return m_edit->text().trimmed();}
-private:
-    QLineEdit *m_edit;
-    Mode       m_mode;
+    explicit PathSelector(QWidget *parent = nullptr);
+    [[nodiscard]] QString path() const{return QDir::fromNativeSeparators(edit->text().trimmed());}
+
+    template<class... PathSelectors, bool... directory>
+    static void _connect_signals(std::integer_sequence<bool, directory...>, PathSelectors*... selectors)
+    {
+        (
+            QObject::connect(
+                selectors->browse,
+                &QPushButton::clicked,
+                selectors,
+                [selector = selectors, is_directory = directory]()
+                {
+                    const QString res = is_directory
+                        ? QFileDialog::getExistingDirectory(selector, "Select Directory")
+                        : QFileDialog::getOpenFileName(selector, "Select File");
+
+                    if (!res.isEmpty())
+                    {
+                        selector->edit->setText(QDir::fromNativeSeparators(res));
+                    }
+                }),
+            ...);
+    }
+
+    QLineEdit *edit;
+    QPushButton*browse;
 };
 
 class PluginBuilderView : public QWidget
@@ -97,6 +119,43 @@ private:
     void write_file(const QString &path, const QString &content);
     void append_log(const QString &log);
 
+
+    void _connect_signals()
+    {
+        connect(m_build,&QPushButton::clicked,this, [this]{
+    m_log_edit->clear();
+    m_progress->setValue(0);
+    m_open_dir->setEnabled(false);
+
+    if (execute_build(false))
+    {
+        m_open_dir->setEnabled(true);
+        QMessageBox::information(this, "Success", "Build finished!");
+        on_open_output_dir();
+    }
+    else
+        QMessageBox::critical(this, "Error", m_last_error);
+});
+
+        connect(m_clean_build, &QPushButton::clicked, this, [this]{
+            m_log_edit->clear();
+            m_progress->setValue(0);
+            m_open_dir->setEnabled(false);
+
+            if (execute_build(true))
+            {
+                m_open_dir->setEnabled(true);
+                QMessageBox::information(this, "Success", "Clean rebuild finished!");
+                on_open_output_dir();
+            }
+            else
+                QMessageBox::critical(this, "Error", m_last_error);
+        });
+
+        PathSelector::_connect_signals(std::integer_sequence<bool,false,true,true>{},m_path_cmake,m_path_source,m_path_qt);
+    }
+
+    QHBoxLayout *m_layout;
     PathSelector *m_path_source;
     PathSelector *m_path_cmake;
     PathSelector *m_path_qt;

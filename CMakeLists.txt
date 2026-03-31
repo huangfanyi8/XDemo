@@ -132,3 +132,33 @@ target_link_libraries(test_plugin_builder  PUBLIC Qt${QT_VERSION_MAJOR}::Widgets
 # add_subdirectory(plugins)   # 如需插件子目录自行打开
 
 deploy_qt_target(test_plugin_builder)
+
+cmake_minimum_required(VERSION 3.20)
+
+project(XDemo LANGUAGES CXX)
+
+# 1. CMake 可执行文件完整路径
+set(EXPORT_CMAKE_PATH "${CMAKE_COMMAND}")
+
+# 2. 当前项目根目录（顶层 CMakeLists.txt 所在目录）
+set(EXPORT_PROJECT_ROOT "${CMAKE_SOURCE_DIR}")
+
+# 3. Qt 路径
+#    这里优先导出 Qt6_DIR / Qt5_DIR；
+#    如果它们都没有，再退回到 CMAKE_PREFIX_PATH 的第一个条目
+set(EXPORT_QT_PATH "")
+
+if(DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
+    set(EXPORT_QT_PATH "${Qt6_DIR}")
+elseif(DEFINED Qt5_DIR AND NOT Qt5_DIR STREQUAL "")
+    set(EXPORT_QT_PATH "${Qt5_DIR}")
+elseif(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
+    list(GET CMAKE_PREFIX_PATH 0 EXPORT_QT_PATH)
+endif()
+
+# 4. 生成 json 文件
+configure_file(
+        "${CMAKE_SOURCE_DIR}/plugins/configure_info.txt"
+        "${CMAKE_SOURCE_DIR}/plugins/configure_info.json"
+        @ONLY
+)

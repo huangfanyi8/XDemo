@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.20)
+
+project({{CLASS_NAME}} LANGUAGES CXX)
+
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
+
+add_library({{CLASS_NAME}} MODULE
+    {{CLASS_NAME}}.h
+    {{CLASS_NAME}}.cpp
+    metadata.json
+)
+
+target_link_libraries({{CLASS_NAME}} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+target_compile_definitions({{CLASS_NAME}} PRIVATE QT_PLUGIN)

@@ -1,0 +1,7 @@
+#pragma once
+namespace env_config
+{
+    inline constexpr auto qt_path = "@QT_PATH@";
+    inline constexpr auto cmake_path = "@CMAKE_PATH@";
+    inline constexpr auto project_root_path= "@PROJECT_ROOT_PATH@";
+}

@@ -9,16 +9,15 @@ if(MSVC)
 endif()
 
 set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)          # <<< 已经打开
+set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ================= 1. 查找 Qt (核心修正点) =================
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets UiPlugin REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets UiPlugin REQUIRED)
 
-# ================= 2. 部署函数 =================
+# 部署函数
 function(deploy_qt_target TARGET_NAME)
     if(NOT WIN32)
         return()
@@ -51,51 +50,31 @@ function(deploy_qt_target TARGET_NAME)
     )
 endfunction()
 
-function(make_qt_clean_run TARGET_NAME)
-    get_target_property(_qmake_path Qt${QT_VERSION_MAJOR}::qmake IMPORTED_LOCATION)
-    get_filename_component(_qt_root "${_qmake_path}" DIRECTORY)
-    get_filename_component(_qt_root "${_qt_root}" DIRECTORY)
-
-    set(_conf_file "${CMAKE_CURRENT_BINARY_DIR}/qt.conf")
-    file(WRITE "${_conf_file}" "[Paths]\nPrefix = ${_qt_root}\nBinaries = bin")
-
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy "${_conf_file}" "$<TARGET_FILE_DIR:${TARGET_NAME}>/qt.conf"
+#指定相关的源代码，添加测试函数
+function(add_test_func  main_src)
+    cmake_parse_arguments(DONG_DONG "" "QRC" "SOURCE_DIR;MODULES" ${ARGN})
+    get_filename_component(target_name ${main_src} NAME_WE )
+    file(GLOB_RECURSE source_files
+            CONFIGURE_DEPENDS
+            "${DONG_DONG_SOURCE_DIR}/*.cpp"
+            "${DONG_DONG_SOURCE_DIR}/*.c"
+            "${DONG_DONG_SOURCE_DIR}/*.h"
+            "${DONG_DONG_SOURCE_DIR}/*.hpp"
+            "${DONG_DONG_SOURCE_DIR}/*.ui"
+            "${DONG_DONG_SOURCE_DIR}/*.qrc"
     )
-endfunction()
-
-# ================= 3. 构建函数 =================
-function(add_test_exe_func)
-    set(options "")
-    set(oneValueArgs QRC)
-    set(multiValueArgs "")
-    cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-    # ---------- 1️⃣ 取得 .cpp ----------
-    list(GET ARG_UNPARSED_ARGUMENTS 0 source_file)
-    list(REMOVE_AT ARG_UNPARSED_ARGUMENTS 0)
-    set(lib_args ${ARG_UNPARSED_ARGUMENTS})
-
-    get_filename_component(target_name ${source_file} NAME_WE)
-
-    # ---------- 2️⃣ 组装所有源文件 ----------
-    set(all_sources ${source_file})
-
-    # 自动把同目录下同名 .h 加进去（如果存在）
-    get_filename_component(src_dir ${source_file} DIRECTORY)
-    set(possible_header "${src_dir}/${target_name}.h")
-    if(EXISTS "${possible_header}")
-        list(APPEND all_sources "${possible_header}")
-    endif()
-
-    # 如果用户给了 QRC，直接加入
+    set(all_sources ${main_src} ${source_files})
     if(ARG_QRC)
         list(APPEND all_sources ${ARG_QRC})
     endif()
+    add_executable(${target_name}  ${all_sources})
 
-    # ---------- 3️⃣ 创建可执行文件 ----------
-    add_executable(${target_name} ${all_sources})
-    target_link_libraries(${target_name} PRIVATE ${lib_args})
+    target_include_directories(${target_name} PUBLIC ${DONG_DONG_SOURCE_DIR})
+
+    message("add target  : ${target_name}")
+    message("add sources  : ${all_sources}")
+
+    target_link_libraries(${target_name} PRIVATE ${DONG_DONG_MODULES})
 
     set_target_properties(${target_name} PROPERTIES
             PREFIX ""
@@ -104,61 +83,105 @@ function(add_test_exe_func)
     deploy_qt_target(${target_name})
 endfunction()
 
-# ================= 4. 定义目标 =================
-add_test_exe_func(test/module1.cpp QRC resources/resources.qrc Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
-add_test_exe_func(test/module2.cpp QRC resources/resources.qrc Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
-add_test_exe_func(test/module3.cpp QRC resources/resources.qrc Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
-add_test_exe_func(test/module4.cpp QRC resources/resources.qrc Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
-add_test_exe_func(test/module5.cpp QRC resources/resources.qrc Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
+add_test_func(test/FileSystem.cpp
+        SOURCE_DIR  ${CMAKE_SOURCE_DIR}/src/FileSystem
+        MODULES Qt${QT_VERSION_MAJOR}::Core)
 
-add_test_exe_func(test/PluginManagementView.cpp Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
+add_test_func(test/ModernListWidget.cpp
+        SOURCE_DIR  ${CMAKE_SOURCE_DIR}/src/ModernListWidget
+        MODULES Qt${QT_VERSION_MAJOR}::Widgets)
 
-add_test_exe_func(test/XListWidget.cpp Qt${QT_VERSION_MAJOR}::Widgets)
-add_test_exe_func(test/XFileSystem.cpp Qt${QT_VERSION_MAJOR}::Core)
+add_test_func(test/ModernTabWidget.cpp
+        SOURCE_DIR  ${CMAKE_SOURCE_DIR}/src/ModernTabWidget
+        MODULES Qt${QT_VERSION_MAJOR}::Widgets)
 
-# 其它目标保持不变
-target_sources(PluginManagementView PRIVATE
-        test/PluginVersionManager.cpp
-        test/PluginVersionManager.h
+add_test_func(test/NodeEditor.cpp
+        SOURCE_DIR  ${CMAKE_SOURCE_DIR}/src/NodeEditor
+        MODULES Qt${QT_VERSION_MAJOR}::Widgets)
+
+
+add_test_func(test/PluginManagementView.cpp
+        SOURCE_DIR    ${CMAKE_SOURCE_DIR}/src/PluginManagementView
+        MODULES  Qt${QT_VERSION_MAJOR}::Widgets  Qt${QT_VERSION_MAJOR}::UiPlugin)
+
+# TemplateRenderer 测试（可执行文件命名为 TestTemplateRenderer 避免与库冲突）
+add_executable(TestTemplateRenderer
+        test/TemplateRenderer.cpp
+        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.cpp
+        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.h
+)
+target_include_directories(TestTemplateRenderer PUBLIC ${CMAKE_SOURCE_DIR}/src/TemplateRenderer)
+target_link_libraries(TestTemplateRenderer PRIVATE TemplateRenderer)
+set_target_properties(TestTemplateRenderer PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/bin/$<CONFIG>"
 )
 
-add_library(PluginBuilder test/PluginBuilder.h test/PluginBuilder.cpp)
-target_link_libraries(PluginBuilder PUBLIC Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::UiPlugin)
 
-add_executable(test_plugin_builder test/test.cpp resources/resources.qrc)
-target_link_libraries(test_plugin_builder PUBLIC PluginBuilder)
-target_link_libraries(test_plugin_builder  PUBLIC Qt${QT_VERSION_MAJOR}::Widgets  Qt${QT_VERSION_MAJOR}::UiPlugin)
+function(generate_configure_info template_file)
+    # ========== 解析可选参数 ==========
+    cmake_parse_arguments(
+            CFG
+            ""
+            "OUTPUT"
+            ""
+            ${ARGN}
+    )
 
-# add_subdirectory(plugins)   # 如需插件子目录自行打开
+    get_filename_component(template_name "${template_file}" NAME_WE)
+    if(DEFINED CFG_OUTPUT AND NOT CFG_OUTPUT STREQUAL "")
+        # 用户指定了输出路径
+        set(output_file "${CFG_OUTPUT}/${template_name}.h")
+    else()
+        # 默认：和模板同目录，扩展名改为 .json
+        get_filename_component(template_dir "${template_file}" DIRECTORY)
 
-deploy_qt_target(test_plugin_builder)
+        set(output_file "${template_dir}/${template_name}.h")
+    endif()
 
-cmake_minimum_required(VERSION 3.20)
 
-project(XDemo LANGUAGES CXX)
+    set(CMAKE_PATH "${CMAKE_COMMAND}")
 
-# 1. CMake 可执行文件完整路径
-set(EXPORT_CMAKE_PATH "${CMAKE_COMMAND}")
+    set(PROJECT_ROOT_PATH "${CMAKE_SOURCE_DIR}")
 
-# 2. 当前项目根目录（顶层 CMakeLists.txt 所在目录）
-set(EXPORT_PROJECT_ROOT "${CMAKE_SOURCE_DIR}")
+    set(QT_PATH "")
 
-# 3. Qt 路径
-#    这里优先导出 Qt6_DIR / Qt5_DIR；
-#    如果它们都没有，再退回到 CMAKE_PREFIX_PATH 的第一个条目
-set(EXPORT_QT_PATH "")
+    if(DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
+        set(QT_PATH "${Qt6_DIR}")
+    elseif(DEFINED Qt5_DIR AND NOT Qt5_DIR STREQUAL "")
+        set(QT_PATH "${Qt5_DIR}")
+    elseif(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
+        list(GET CMAKE_PREFIX_PATH 0 EXPORT_QT_PATH)
+    endif()
 
-if(DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
-    set(EXPORT_QT_PATH "${Qt6_DIR}")
-elseif(DEFINED Qt5_DIR AND NOT Qt5_DIR STREQUAL "")
-    set(EXPORT_QT_PATH "${Qt5_DIR}")
-elseif(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
-    list(GET CMAKE_PREFIX_PATH 0 EXPORT_QT_PATH)
-endif()
+    configure_file(
+            "${template_file}"
+            "${output_file}"
+            @ONLY
+    )
 
-# 4. 生成 json 文件
-configure_file(
-        "${CMAKE_SOURCE_DIR}/plugins/configure_info.txt"
-        "${CMAKE_SOURCE_DIR}/plugins/configure_info.json"
-        @ONLY
+endfunction()
+
+generate_configure_info(${CMAKE_SOURCE_DIR}/templates/plugin/configure_info.h.in
+        OUTPUT ${CMAKE_SOURCE_DIR}/plugins
 )
+target_include_directories(PluginManagementView  PRIVATE ${CMAKE_SOURCE_DIR}/plugins)
+function(add_lib  lib_name)
+    cmake_parse_arguments(LIB "" "SOURCE_DIR"  "MODULES"   ${ARGN})
+    file(GLOB_RECURSE LIB_SOURCES
+            CONFIGURE_DEPENDS
+            "${LIB_SOURCE_DIR}/*.cpp"
+            "${LIB_SOURCE_DIR}/*.c"
+            "${LIB_SOURCE_DIR}/*.h"
+            "${LIB_SOURCE_DIR}/*.hpp"
+            "${LIB_SOURCE_DIR}/*.ui"
+            "${LIB_SOURCE_DIR}/*.qrc"
+    )
+    add_library(${lib_name} ${LIB_SOURCES})
+    target_link_libraries(${lib_name} ${LIB_MODULES})
+    target_include_directories(${lib_name} PUBLIC ${LIB_SOURCE_DIR})
+    message("add lib : ${lib_name},源代码目录在 :${LIB_SOURCE_DIR} ,包含了  ${LIB_SOURCES}")
+endfunction()
+
+add_lib(TemplateRenderer
+        SOURCE_DIR   ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
+        MODULES "")

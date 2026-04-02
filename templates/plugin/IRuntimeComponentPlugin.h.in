@@ -1,0 +1,35 @@
+/**
+ * @file RuntimeComponentPlugin.h
+ * @brief 运行时自定义组件插件接口（用于动态创建组件）
+ *
+ * 说明：
+ * - C++ 源码无法直接运行，必须先编译为 DLL（Qt 插件）。
+ * - 插件加载后，通过该接口向宿主提供组件创建能力。
+ */
+#pragma once
+
+#include "ComponentManager/ComponentManagerExport.h"
+#include <core/component/BaseComponent.h>
+#include <QObject>
+#include <QStringList>
+
+namespace {{namespace_name}}
+{
+
+class {{EXPORT_FORMAT}} IRuntimeComponentPlugin
+{
+public:
+    virtual ~IRuntimeComponentPlugin() = default;
+
+    virtual QStringList typeNames() const = 0;
+    [[nodiscard]] QString name() const override=0;
+    [[nodiscard]] QString version() const override=0;
+    virtual {{return_type}}* create(const QString& typeName, QObject* parent = nullptr) = 0;
+};
+
+}
+
+#define LOWCODE_RUNTIME_COMPONENT_PLUGIN_IID "com.wrj.lowcode.RuntimeComponentPlugin/1.0"
+Q_DECLARE_INTERFACE({{namespace_name}}::IRuntimeComponentPlugin, LOWCODE_RUNTIME_COMPONENT_PLUGIN_IID)
+
+

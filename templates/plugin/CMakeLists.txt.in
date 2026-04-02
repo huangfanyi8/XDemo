@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION {{CMAKE_MINIMUM_REQUIRED_VERSION}})
 
 project({{CLASS_NAME}} LANGUAGES CXX)
 
@@ -11,12 +11,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 
-add_library({{CLASS_NAME}} MODULE
-    {{CLASS_NAME}}.h
-    {{CLASS_NAME}}.cpp
-    metadata.json
+# 递归收集当前目录下的源文件、头文件、UI、QRC
+file(GLOB_RECURSE plugin_sources CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cxx"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
-target_link_libraries({{CLASS_NAME}} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+add_library({{CLASS_NAME}} MODULE
+    ${plugin_sources}
+)
 
-target_compile_definitions({{CLASS_NAME}} PRIVATE QT_PLUGIN)
+target_link_libraries({{CLASS_NAME}} PRIVATE
+    Qt${QT_VERSION_MAJOR}::Widgets
+)
+
+

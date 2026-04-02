@@ -104,61 +104,49 @@ add_test_func(test/PluginManagementView.cpp
         SOURCE_DIR    ${CMAKE_SOURCE_DIR}/src/PluginManagementView
         MODULES  Qt${QT_VERSION_MAJOR}::Widgets  Qt${QT_VERSION_MAJOR}::UiPlugin)
 
-# TemplateRenderer 测试（可执行文件命名为 TestTemplateRenderer 避免与库冲突）
-add_executable(TestTemplateRenderer
-        test/TemplateRenderer.cpp
-        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.cpp
-        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.h
-)
-target_include_directories(TestTemplateRenderer PUBLIC ${CMAKE_SOURCE_DIR}/src/TemplateRenderer)
-target_link_libraries(TestTemplateRenderer PRIVATE TemplateRenderer)
-set_target_properties(TestTemplateRenderer PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/bin/$<CONFIG>"
-)
+add_test_func(test/TestTemplateRenderer.cpp
+        SOURCE_DIR    ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
+        MODULES Qt${QT_VERSION_MAJOR}::Core)
 
 
 function(generate_configure_info template_file)
-    # ========== 解析可选参数 ==========
     cmake_parse_arguments(
+            PARSE_ARGV 1
             CFG
             ""
             "OUTPUT"
             ""
-            ${ARGN}
     )
 
     get_filename_component(template_name "${template_file}" NAME_WE)
+
     if(DEFINED CFG_OUTPUT AND NOT CFG_OUTPUT STREQUAL "")
-        # 用户指定了输出路径
         set(output_file "${CFG_OUTPUT}/${template_name}.h")
     else()
-        # 默认：和模板同目录，扩展名改为 .json
         get_filename_component(template_dir "${template_file}" DIRECTORY)
-
         set(output_file "${template_dir}/${template_name}.h")
     endif()
 
-
     set(CMAKE_PATH "${CMAKE_COMMAND}")
-
     set(PROJECT_ROOT_PATH "${CMAKE_SOURCE_DIR}")
-
     set(QT_PATH "")
+    set(QT_PREFIX_PATH "")
 
     if(DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
         set(QT_PATH "${Qt6_DIR}")
     elseif(DEFINED Qt5_DIR AND NOT Qt5_DIR STREQUAL "")
         set(QT_PATH "${Qt5_DIR}")
     elseif(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
-        list(GET CMAKE_PREFIX_PATH 0 EXPORT_QT_PATH)
+        list(GET CMAKE_PREFIX_PATH 0 QT_PREFIX_PATH)
     endif()
 
-    configure_file(
-            "${template_file}"
-            "${output_file}"
-            @ONLY
-    )
+    if(NOT QT_PATH STREQUAL "")
+        cmake_path(GET QT_PATH PARENT_PATH _qt_tmp_1)
+        cmake_path(GET _qt_tmp_1 PARENT_PATH _qt_tmp_2)
+        cmake_path(GET _qt_tmp_2 PARENT_PATH QT_PREFIX_PATH)
+    endif()
 
+    configure_file("${template_file}" "${output_file}" @ONLY)
 endfunction()
 
 generate_configure_info(${CMAKE_SOURCE_DIR}/templates/plugin/configure_info.h.in
@@ -184,4 +172,6 @@ endfunction()
 
 add_lib(TemplateRenderer
         SOURCE_DIR   ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
-        MODULES "")
+        MODULES Qt${QT_VERSION_MAJOR}::Core)
+
+target_link_libraries(PluginManagementView PRIVATE TemplateRenderer)

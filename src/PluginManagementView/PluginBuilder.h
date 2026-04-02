@@ -1,34 +1,33 @@
-﻿#ifndef PLUGINBUILDER_H
+#ifndef PLUGINBUILDER_H
 #define PLUGINBUILDER_H
 
-#include <QWidget>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QProgressBar>
-#include <QPlainTextEdit>
+#include <QDir>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QVBoxLayout>
+#include <QLineEdit>
 #include <QMessageBox>
-#include <QFileDialog>
-#include <QDesktopServices>
-#include <QUrl>
-#include <QDateTime>
-#include <QDir>
-#include <QProcess>
-#include <QVariantMap>
-#include <QJsonObject>
+#include <QPlainTextEdit>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QWidget>
 
 struct PathSelector
-    :QWidget
+    : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit PathSelector(QWidget *parent = nullptr);
-    [[nodiscard]] QString path() const{return QDir::fromNativeSeparators(edit->text().trimmed());}
+
+    [[nodiscard]] QString path() const
+    {
+        return QDir::fromNativeSeparators(edit->text().trimmed());
+    }
 
     template<class... PathSelectors, bool... directory>
-    static void _connect_signals(std::integer_sequence<bool, directory...>, PathSelectors*... selectors)
+    static void _connect_signals(std::integer_sequence<bool, directory...>, PathSelectors *... selectors)
     {
         (
             QObject::connect(
@@ -49,129 +48,54 @@ public:
             ...);
     }
 
-    QLineEdit *edit;
-    QPushButton*browse;
+    QLineEdit *edit = nullptr;
+    QPushButton *browse = nullptr;
 };
 
-class PluginBuilderView : public QWidget
+class PluginBuilderView
+    : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit PluginBuilderView(QWidget *parent = nullptr);
 
 private slots:
-    /**
-     * @brief 在系统文件管理器中打开当前输出目录。
-     */
     void on_open_output_dir();
 
 private:
-    /**
-     * @brief 初始化界面控件与布局。
-     */
-    void setup_ui();
-
-    /**
-     * @brief 执行插件构建完整流程。
-     * @param clean_first 为 true 时先清理旧的构建目录。
-     * @return 构建与发布全部成功时返回 true，否则返回 false。
-     */
-    bool execute_build(bool clean_first = false);
-
-    /**
-     * @brief 读取模板并生成构建所需代码文件。
-     * @param out_dir 输出目录。
-     * @param template_dir 模板目录。
-     * @param metadata_file_path 元数据文件路径。
-     * @param metadata 元数据对象。
-     * @return 代码生成成功时返回 true，否则返回 false。
-     */
-    bool generate_plugin_files(const QString &out_dir,
-                               const QString &template_dir,
-                               const QString &metadata_file_path,
-                               const QJsonObject &metadata);
-
-    /**
-     * @brief 运行外部进程，并在需要时自动加载 MSVC 环境。
-     * @param cmd 可执行文件路径。
-     * @param args 命令行参数列表。
-     * @param working_dir 进程工作目录。
-     * @param use_msvc_environment 为 true 时先加载 MSVC 环境。
-     * @return 构建成功时返回 true，否则返回 false。
-     */
-    bool run_process(const QString &cmd,
+    void _setup_ui();
+    void _connect_signals();
+    void append_log(const QString &log){    m_log_edit->appendPlainText(log);}
+    bool build();
+    bool _execute_cmake(const QString &cmd,
                      const QStringList &args,
                      const QString &working_dir,
                      bool use_msvc_environment = false);
-
-    /**
-     * @brief 查找 MSVC 构建所需的 vcvars64.bat。
-     * @return 找到时返回绝对路径，否则返回空字符串。
-     */
     QString find_vcvars64() const;
+    void set_last_error(const QString &error);
 
-    /**
-     * @brief 向文件写入文本内容。
-     * @param path 目标文件路径。
-     * @param content 要写入的内容。
-     * @return 写入成功时返回 true，否则返回 false。
-     */
-    bool write_file(const QString &path, const QString &content);
-
-    /**
-     * @brief 向日志窗口追加一行文本。
-     * @param log 日志内容。
-     */
-    void append_log(const QString &log);
-
-
-    void _connect_signals()
+    template<class...String,std::enable_if_t<(std::is_same_v<std::decay_t<String>, QString> && ...),int> = 0>
+    bool _validate_paths(const String&... paths)
     {
-        connect(m_build,&QPushButton::clicked,this, [this]{
-    m_log_edit->clear();
-    m_progress->setValue(0);
-    m_open_dir->setEnabled(false);
+        return (... && [this](const QString& path)
+        {
+            if (QDir().mkpath(path))
+                return true;
 
-    if (execute_build(false))
-    {
-        m_open_dir->setEnabled(true);
-        QMessageBox::information(this, "Success", "Build finished!");
-        on_open_output_dir();
-    }
-    else
-        QMessageBox::critical(this, "Error", m_last_error);
-});
-
-        connect(m_clean_build, &QPushButton::clicked, this, [this]{
-            m_log_edit->clear();
-            m_progress->setValue(0);
-            m_open_dir->setEnabled(false);
-
-            if (execute_build(true))
-            {
-                m_open_dir->setEnabled(true);
-                QMessageBox::information(this, "Success", "Clean rebuild finished!");
-                on_open_output_dir();
-            }
-            else
-                QMessageBox::critical(this, "Error", m_last_error);
-        });
-
-        PathSelector::_connect_signals(std::integer_sequence<bool,true>{}, m_path_source);
+            set_last_error(path);
+            return false;
+        }(paths));
     }
 
-    QHBoxLayout *m_layout;
-    PathSelector *m_path_source;
-    PathSelector *m_path_cmake;
-    PathSelector *m_path_qt;
-    QPushButton   *m_build;
-    QPushButton   *m_clean_build;
-    QPushButton   *m_open_dir;
-    QProgressBar *m_progress;
-    QPlainTextEdit* m_log_edit;
+    PathSelector *m_path_source = nullptr;
+    QPushButton *m_build = nullptr;
+    QPushButton *m_clean_build = nullptr;
+    QProgressBar *m_progress = nullptr;
+    QPlainTextEdit *m_log_edit = nullptr;
 
     QString m_last_error;
-    QString m_out_dir;
+    QString m_build_dir;//插件的构建沙箱环境
 };
 
 #endif // PLUGINBUILDER_H

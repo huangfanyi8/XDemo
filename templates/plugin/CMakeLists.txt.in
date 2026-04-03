@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION {{CMAKE_MINIMUM_REQUIRED_VERSION}})
 
-project({{CLASS_NAME}} LANGUAGES CXX)
+project({{PLUGIN_NAME}} LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets UiPlugin REQUIRED)
 
 # 递归收集当前目录下的源文件、头文件、UI、QRC
 file(GLOB_RECURSE plugin_sources CONFIGURE_DEPENDS
@@ -23,12 +23,23 @@ file(GLOB_RECURSE plugin_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
-add_library({{CLASS_NAME}} MODULE
-    ${plugin_sources}
+add_library({{PLUGIN_NAME}} MODULE ${plugin_sources})
+
+set_target_properties({{PLUGIN_NAME}} PROPERTIES
+    PREFIX ""
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin/$<CONFIG>"
 )
 
-target_link_libraries({{CLASS_NAME}} PRIVATE
+target_link_libraries({{PLUGIN_NAME}} PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::UiPlugin
 )
+if(MSVC)
+    target_compile_options({{PLUGIN_NAME}} PRIVATE /MP)
+endif()
+
+target_precompile_headers({{PLUGIN_NAME}} PRIVATE <QtWidgets/QtWidgets>
+        <QUiPlugin>)
 
 

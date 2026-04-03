@@ -68,10 +68,7 @@ private:
     void _connect_signals();
     void append_log(const QString &log){    m_log_edit->appendPlainText(log);}
     bool build();
-    bool _execute_cmake(const QString &cmd,
-                     const QStringList &args,
-                     const QString &working_dir,
-                     bool use_msvc_environment = false);
+    bool _execute_cmake(const QString &cmd,const QStringList &args,const QString &working_dir);
     QString find_vcvars64() const;
     void set_last_error(const QString &error);
 
@@ -82,7 +79,6 @@ private:
         {
             if (QDir().mkpath(path))
                 return true;
-
             set_last_error(path);
             return false;
         }(paths));
@@ -95,7 +91,7 @@ private:
     QPlainTextEdit *m_log_edit = nullptr;
 
     QString m_last_error;
-    QString m_build_dir;//插件的构建沙箱环境
+    QString m_sandbox_dir;//插件的构建沙箱环境
 };
 
 #endif // PLUGINBUILDER_H

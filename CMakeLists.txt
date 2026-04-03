@@ -69,7 +69,10 @@ function(add_test_func  main_src)
     endif()
     add_executable(${target_name}  ${all_sources})
 
-    target_include_directories(${target_name} PUBLIC ${DONG_DONG_SOURCE_DIR})
+    message("mustache   dir is ${CMAKE_SOURCE_DIR}/mustache")
+    target_include_directories(${target_name}
+            PUBLIC ${DONG_DONG_SOURCE_DIR}
+    PUBLIC ${CMAKE_SOURCE_DIR}/mustache)
 
     message("add target  : ${target_name}")
     message("add sources  : ${all_sources}")
@@ -128,6 +131,8 @@ function(generate_configure_info template_file)
     endif()
 
     set(CMAKE_PATH "${CMAKE_COMMAND}")
+    set(GENERATOR"${CMAKE_GENERATOR}")
+    set(BUILD_TYPE "${CMAKE_BUILD_TYPE}")
     set(PROJECT_ROOT_PATH "${CMAKE_SOURCE_DIR}")
     set(QT_PATH "")
     set(QT_PREFIX_PATH "")
@@ -173,5 +178,6 @@ endfunction()
 add_lib(TemplateRenderer
         SOURCE_DIR   ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
         MODULES Qt${QT_VERSION_MAJOR}::Core)
-
+message(STATUS " Generator: ${CMAKE_GENERATOR}")
+message("${CMAKE_GENERATOR_PLATFORM}")
 target_link_libraries(PluginManagementView PRIVATE TemplateRenderer)

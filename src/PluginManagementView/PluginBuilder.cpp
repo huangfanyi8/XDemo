@@ -28,9 +28,7 @@ struct PluginMetadata
     QString description;
 };
 
-bool load_metadata(const QString &metadata_file_path,
-                   PluginMetadata &metadata,
-                   QString &error_message)
+bool load_metadata(const QString &metadata_file_path,PluginMetadata &metadata,QString &error_message)
 {
     QFile file(metadata_file_path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -73,49 +71,6 @@ bool load_metadata(const QString &metadata_file_path,
     }
 
     return true;
-}
-
-QString quote_for_log(const QString &value)
-{
-    QString escaped = value;
-    escaped.replace('"', "\\\"");
-    if (escaped.contains(' ') || escaped.contains('\t'))
-    {
-        return "\"" + escaped + "\"";
-    }
-
-    return escaped;
-}
-
-QString quote_for_cmd(const QString &value)
-{
-    QString escaped = QDir::toNativeSeparators(value);
-    escaped.replace('"', "\"\"");
-    return "\"" + escaped + "\"";
-}
-
-QString build_command_for_cmd(const QString &program, const QStringList &args)
-{
-    QStringList command_parts;
-    command_parts.append(quote_for_cmd(program));
-
-    for (const QString &arg : args)
-    {
-        command_parts.append(quote_for_cmd(arg));
-    }
-
-    return command_parts.join(" ");
-}
-
-QString format_command_for_log(const QString &program, const QStringList &args)
-{
-    QStringList formatted_args;
-    for (const QString &arg : args)
-    {
-        formatted_args.append(quote_for_log(arg));
-    }
-
-    return QString("%1 %2").arg(quote_for_log(program), formatted_args.join(" "));
 }
 
 } // namespace
@@ -204,51 +159,19 @@ void PluginBuilderView::_connect_signals()
     PathSelector::_connect_signals(std::integer_sequence<bool, true>{}, m_path_source);
 }
 
-bool PluginBuilderView::_execute_cmake(const QString &cmd,
+bool PluginBuilderView::_execute_cmake(const QString &cmake,
                                     const QStringList &args,
-                                    const QString &working_dir,
-                                    bool use_msvc_environment)
+                                    const QString &working_dir)
 {
-    QString program = QDir::fromNativeSeparators(cmd);
-    QStringList program_args = args;
-
-#ifdef Q_OS_WIN
-    if (use_msvc_environment)
-    {
-        const QString vcvars_path = find_vcvars64();
-        if (vcvars_path.isEmpty())
-        {
-            set_last_error("vcvars64.bat not found.");
-            return false;
-        }
-
-        program = QDir::fromNativeSeparators(
-            qEnvironmentVariable("ComSpec", "C:/Windows/System32/cmd.exe"));
-        program_args = QStringList{
-            "/d",
-            "/c",
-            "call "
-                + quote_for_cmd(vcvars_path)
-                + " >nul && "
-                + build_command_for_cmd(cmd, args)
-        };
-
-        append_log("MSVC environment: " + QDir::toNativeSeparators(vcvars_path));
-    }
-#else
-    Q_UNUSED(use_msvc_environment);
-#endif
-
     QProcess process;
     process.setWorkingDirectory(working_dir);
 
     append_log("Working directory: " + QDir::toNativeSeparators(working_dir));
-    append_log("Running: " + format_command_for_log(program, program_args));
 
-    process.start(program, program_args);
+    process.start(cmake, args);
     if (!process.waitForStarted(5000))
     {
-        set_last_error("Failed to start process: " + program);
+        set_last_error("Failed to start CMake: " + cmake);
         return false;
     }
 
@@ -285,113 +208,13 @@ bool PluginBuilderView::_execute_cmake(const QString &cmd,
         }
         else
         {
-            set_last_error(QString("Process exited with code %1.")
-                               .arg(process.exitCode()));
+            set_last_error(QString("Process exited with code %1.").arg(process.exitCode()));
         }
 
         return false;
     }
 
     return true;
-}
-
-QString PluginBuilderView::find_vcvars64() const
-{
-#ifdef Q_OS_WIN
-    auto try_candidate = [](const QString &path) {
-        const QFileInfo file_info(path);
-        if (!file_info.exists() || !file_info.isFile())
-        {
-            return QString{};
-        }
-
-        return QDir::fromNativeSeparators(file_info.absoluteFilePath());
-    };
-
-    const QString vs_install_dir = qEnvironmentVariable("VSINSTALLDIR");
-    if (!vs_install_dir.isEmpty())
-    {
-        const QString vcvars_path =
-            try_candidate(vs_install_dir + "/VC/Auxiliary/Build/vcvars64.bat");
-        if (!vcvars_path.isEmpty())
-        {
-            return vcvars_path;
-        }
-    }
-
-    const QString program_files_x86 = qEnvironmentVariable("ProgramFiles(x86)");
-    if (!program_files_x86.isEmpty())
-    {
-        const QString vswhere_path =
-            QDir::fromNativeSeparators(program_files_x86
-                                       + "/Microsoft Visual Studio/Installer/vswhere.exe");
-        if (QFileInfo(vswhere_path).exists())
-        {
-            QProcess process;
-            process.start(vswhere_path,
-                          {
-                              "-latest",
-                              "-products", "*",
-                              "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-                              "-find", "VC\\Auxiliary\\Build\\vcvars64.bat"
-                          });
-
-            if (process.waitForFinished(5000) && process.exitCode() == 0)
-            {
-                const QString output =
-                    QString::fromLocal8Bit(process.readAllStandardOutput()).trimmed();
-                if (!output.isEmpty())
-                {
-                    const QStringList lines = output.split('\n', QString::SkipEmptyParts);
-                    for (const QString &line : lines)
-                    {
-                        const QString vcvars_path = try_candidate(line.trimmed());
-                        if (!vcvars_path.isEmpty())
-                        {
-                            return vcvars_path;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    const QString program_files = qEnvironmentVariable("ProgramFiles");
-    const QStringList roots{
-        QDir::fromNativeSeparators(program_files + "/Microsoft Visual Studio"),
-        QDir::fromNativeSeparators(program_files_x86 + "/Microsoft Visual Studio")
-    };
-    const QStringList versions{"2022", "2019", "2017"};
-    const QStringList editions{"Professional", "Community", "Enterprise", "BuildTools"};
-
-    for (const QString &root : roots)
-    {
-        if (root.isEmpty())
-        {
-            continue;
-        }
-
-        for (const QString &version : versions)
-        {
-            for (const QString &edition : editions)
-            {
-                const QString vcvars_path =
-                    try_candidate(root
-                                  + "/"
-                                  + version
-                                  + "/"
-                                  + edition
-                                  + "/VC/Auxiliary/Build/vcvars64.bat");
-                if (!vcvars_path.isEmpty())
-                {
-                    return vcvars_path;
-                }
-            }
-        }
-    }
-#endif
-
-    return {};
 }
 
 bool PluginBuilderView::build()
@@ -435,16 +258,16 @@ bool PluginBuilderView::build()
     append_log("Metadata file: " + QDir::toNativeSeparators(metadata_file_path));
     append_log(QString("Plugin: %1 (Version: %2, Class: %3)").arg(metadata.plugin_name, metadata.plugin_version, metadata.class_name));
 
-    m_build_dir = source_dir + "/build/" ;
-    const QString build_dir = m_build_dir + "/build";
-    const QString built_plugin_path = m_build_dir + "/plugin" + metadata.class_name + ".dll";
+    this->m_sandbox_dir = source_dir + "/build/" ;
+    const QString build_dir = m_sandbox_dir + "/build";
+    const QString built_plugin_path = m_sandbox_dir + "/plugin/" + metadata.class_name + ".dll";
     const QString publish_dir = QDir(project_root_dir).filePath("plugins/"+ metadata.plugin_name+ "/"+ metadata.plugin_version);
     const QString publish_path =
         QDir(publish_dir).filePath(metadata.plugin_name+ "_"+ metadata.plugin_version+ ".dll");
 
-    this->_validate_paths(m_build_dir,build_dir,publish_dir);
+    this->_validate_paths(m_sandbox_dir,build_dir,publish_dir);
 
-    append_log("Output directory: " + QDir::toNativeSeparators(m_build_dir));
+    append_log("Output directory: " + QDir::toNativeSeparators(m_sandbox_dir));
     append_log("Build directory: " + QDir::toNativeSeparators(build_dir));
 
     DongDong::TemplateRenderer renderer;
@@ -461,7 +284,7 @@ bool PluginBuilderView::build()
     std::vector<std::filesystem::path> created_files;
     m_progress->setValue(10);
     if (!renderer.generate_plugin_files(
-            DongDong::TextEncodingHelper::to_filesystem_path(m_build_dir),
+            DongDong::TextEncodingHelper::to_filesystem_path(m_sandbox_dir),
             DongDong::TextEncodingHelper::to_filesystem_path(template_dir),
             DongDong::TextEncodingHelper::to_filesystem_path(metadata_file_path),
             template_context,
@@ -473,30 +296,27 @@ bool PluginBuilderView::build()
 
     for (const auto &created_file : created_files)
     {
-        append_log("Created: "
-                   + DongDong::TextEncodingHelper::from_filesystem_path(created_file));
+        append_log("Created: "+ DongDong::TextEncodingHelper::from_filesystem_path(created_file));
     }
 
     m_progress->setValue(20);
     if (!_execute_cmake(cmake_exe,
-                     {
-                         "-S", m_build_dir,
-                         "-B", build_dir,
-                         "-DCMAKE_PREFIX_PATH=" + qt_prefix_path,
-                         "-DCMAKE_BUILD_TYPE=Release"
-                     },
-                     build_dir,
-                     use_msvc_environment))
+            {
+                "-G" , "Visual Studio 17 2022",
+                "-A" , "x64",
+                "-S", m_sandbox_dir,
+                "-B", build_dir,
+                "-DCMAKE_PREFIX_PATH=" + qt_prefix_path,
+                "-DCMAKE_BUILD_TYPE=Release"
+            },
+            build_dir))
     {
         set_last_error("CMake configure failed: " );
         return false;
     }
 
     m_progress->setValue(50);
-    if (!_execute_cmake(cmake_exe,
-                     {"--build", build_dir, "--config", "Release"},
-                     build_dir,
-                     use_msvc_environment))
+    if (!_execute_cmake(cmake_exe,{"--build", build_dir, "--config", "Release","--j 8"},build_dir))
     {
         set_last_error("CMake build failed: " );
         return false;
@@ -516,8 +336,8 @@ bool PluginBuilderView::build()
 
 void PluginBuilderView::on_open_output_dir()
 {
-    if (!m_build_dir.isEmpty())
+    if (!m_sandbox_dir.isEmpty())
     {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(m_build_dir));
+        QDesktopServices::openUrl(QUrl::fromLocalFile(m_sandbox_dir));
     }
 }

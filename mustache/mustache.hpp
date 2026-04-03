@@ -39,8 +39,8 @@
 #include <unordered_map>
 #include <vector>
 
-namespace kainjow {
-namespace mustache {
+
+namespace kainjow::mustache {
 
 template <typename string_type>
 string_type trim(const string_type& s) {
@@ -1179,7 +1179,7 @@ using lambda_t = basic_lambda_t<mustache::string_type>;
 using mustachew = basic_mustache<std::wstring>;
 using dataw = basic_data<mustachew::string_type>;
 
-} // namespace mustache
-} // namespace kainjow
+} // namespace kainjow::mustache
+
 
 #endif // KAINJOW_MUSTACHE_HPP

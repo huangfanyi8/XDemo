@@ -40,7 +40,8 @@
 #include <vector>
 
 
-namespace kainjow::mustache {
+namespace kainjow::mustache
+{
 
 template <typename string_type>
 string_type trim(const string_type& s) {

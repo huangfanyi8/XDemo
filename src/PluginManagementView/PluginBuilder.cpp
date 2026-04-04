@@ -13,7 +13,6 @@
 #include <QUrl>
 
 #include <filesystem>
-#include <vector>
 
 namespace
 {

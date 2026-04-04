@@ -1,3 +1,4 @@
+
 #pragma once
 //在这里添加组件的基础类型
 #include "IRuntimeComponentPlugin.h"
@@ -16,10 +17,12 @@ public:
 
     [[nodiscard]] QString name() const override;
     [[nodiscard]] QString version() const override;
+    [[nodiscard]] QStringList history() const override;
 
-    {{return_type}}* create(QWidget *parent = nullptr) override;
+    QWidget* create_widget(QWidget *parent = nullptr) override;
 
+private:
+    void setup_ui();
 };
 
-
-
+#endif // {{CLASS_NAME}}_H

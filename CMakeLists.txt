@@ -8,6 +8,7 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
+set(CMAKE_FIND_DEBUG_MODE TRUE)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -16,7 +17,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets UiPlugin REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets UiPlugin REQUIRED)
-
+if (QT_VERSION_MAJOR EQUAL 6)
+    find_package(Qt6 REQUIRED COMPONENTS Core5Compat)
+endif()
 # 部署函数
 function(deploy_qt_target TARGET_NAME)
     if(NOT WIN32)
@@ -69,10 +72,7 @@ function(add_test_func  main_src)
     endif()
     add_executable(${target_name}  ${all_sources})
 
-    message("mustache   dir is ${CMAKE_SOURCE_DIR}/mustache")
-    target_include_directories(${target_name}
-            PUBLIC ${DONG_DONG_SOURCE_DIR}
-    PUBLIC ${CMAKE_SOURCE_DIR}/mustache)
+    target_include_directories(${target_name} PUBLIC ${DONG_DONG_SOURCE_DIR})
 
     message("add target  : ${target_name}")
     message("add sources  : ${all_sources}")
@@ -83,6 +83,10 @@ function(add_test_func  main_src)
             PREFIX ""
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/bin/$<CONFIG>"
     )
+
+    if (QT_VERSION_MAJOR EQUAL 6)
+        target_link_libraries(${target_name} PRIVATE Qt6::Core5Compat)
+    endif()
     deploy_qt_target(${target_name})
 endfunction()
 
@@ -107,51 +111,61 @@ add_test_func(test/PluginManagementView.cpp
         SOURCE_DIR    ${CMAKE_SOURCE_DIR}/src/PluginManagementView
         MODULES  Qt${QT_VERSION_MAJOR}::Widgets  Qt${QT_VERSION_MAJOR}::UiPlugin)
 
-add_test_func(test/TestTemplateRenderer.cpp
-        SOURCE_DIR    ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
-        MODULES Qt${QT_VERSION_MAJOR}::Core)
+# TemplateRenderer 测试（可执行文件命名为 TestTemplateRenderer 避免与库冲突）
+add_executable(TestTemplateRenderer
+        test/TemplateRenderer.cpp
+        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.cpp
+        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.h
+)
+target_include_directories(TestTemplateRenderer PUBLIC ${CMAKE_SOURCE_DIR}/src/TemplateRenderer)
+target_link_libraries(TestTemplateRenderer PRIVATE TemplateRenderer)
+set_target_properties(TestTemplateRenderer PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/bin/$<CONFIG>"
+)
 
 
 function(generate_configure_info template_file)
+    # ========== 解析可选参数 ==========
     cmake_parse_arguments(
-            PARSE_ARGV 1
             CFG
             ""
             "OUTPUT"
             ""
+            ${ARGN}
     )
 
     get_filename_component(template_name "${template_file}" NAME_WE)
-
     if(DEFINED CFG_OUTPUT AND NOT CFG_OUTPUT STREQUAL "")
+        # 用户指定了输出路径
         set(output_file "${CFG_OUTPUT}/${template_name}.h")
     else()
+        # 默认
         get_filename_component(template_dir "${template_file}" DIRECTORY)
+
         set(output_file "${template_dir}/${template_name}.h")
     endif()
 
+
     set(CMAKE_PATH "${CMAKE_COMMAND}")
-    set(GENERATOR"${CMAKE_GENERATOR}")
-    set(BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+
     set(PROJECT_ROOT_PATH "${CMAKE_SOURCE_DIR}")
+
     set(QT_PATH "")
-    set(QT_PREFIX_PATH "")
 
     if(DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
         set(QT_PATH "${Qt6_DIR}")
     elseif(DEFINED Qt5_DIR AND NOT Qt5_DIR STREQUAL "")
         set(QT_PATH "${Qt5_DIR}")
     elseif(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
-        list(GET CMAKE_PREFIX_PATH 0 QT_PREFIX_PATH)
+        list(GET CMAKE_PREFIX_PATH 0 EXPORT_QT_PATH)
     endif()
 
-    if(NOT QT_PATH STREQUAL "")
-        cmake_path(GET QT_PATH PARENT_PATH _qt_tmp_1)
-        cmake_path(GET _qt_tmp_1 PARENT_PATH _qt_tmp_2)
-        cmake_path(GET _qt_tmp_2 PARENT_PATH QT_PREFIX_PATH)
-    endif()
+    configure_file(
+            "${template_file}"
+            "${output_file}"
+            @ONLY
+    )
 
-    configure_file("${template_file}" "${output_file}" @ONLY)
 endfunction()
 
 generate_configure_info(${CMAKE_SOURCE_DIR}/templates/plugin/configure_info.h.in
@@ -177,7 +191,4 @@ endfunction()
 
 add_lib(TemplateRenderer
         SOURCE_DIR   ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
-        MODULES Qt${QT_VERSION_MAJOR}::Core)
-message(STATUS " Generator: ${CMAKE_GENERATOR}")
-message("${CMAKE_GENERATOR_PLATFORM}")
-target_link_libraries(PluginManagementView PRIVATE TemplateRenderer)
+        MODULES "")

@@ -1,8 +1,3 @@
-/**
- * @file TemplateRenderer.h
- * @brief 单文件 Mustache 模板渲染器，内置 Qt / std 路径与 UTF-8 适配
- */
-
 #ifndef TEMPLATE_RENDERER_H
 #define TEMPLATE_RENDERER_H
 
@@ -12,16 +7,18 @@
 #include <optional>
 #include <filesystem>
 #include <system_error>
-
-#include <QString>
-#include <QByteArray>
-
 #include "../../mustache/mustache.hpp"
+
+#include <unordered_map>
+#include <optional>
+#include <mutex>
+
 
 
 
 namespace DongDong
 {
+
     namespace mustache =  kainjow::mustache;
 
     struct Diagnostic
@@ -44,4 +41,5 @@ namespace DongDong
 
 }
 
-#endif // TEMPLATE_RENDERER_H
+
+#endif

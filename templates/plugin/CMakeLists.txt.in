@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION {{CMAKE_MINIMUM_REQUIRED_VERSION}})
+cmake_minimum_required(VERSION {{cmake_minimum_required_version}})
 
-project({{PLUGIN_NAME}}Generator LANGUAGES CXX)
+project({{plugin_name}}Generator LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -23,23 +23,21 @@ file(GLOB_RECURSE plugin_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
-add_library({{PLUGIN_NAME}} MODULE ${plugin_sources})
+add_library({{plugin_name}} MODULE ${plugin_sources})
 
-set_target_properties({{PLUGIN_NAME}} PROPERTIES
+set_target_properties({{plugin_name}} PROPERTIES
     PREFIX ""
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin/$<CONFIG>"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin/$<CONFIG>"
 )
 
-target_link_libraries({{PLUGIN_NAME}} PRIVATE
+target_link_libraries({{plugin_name}} PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::UiPlugin
 )
 if(MSVC)
-    target_compile_options({{PLUGIN_NAME}} PRIVATE /MP)
+    target_compile_options({{plugin_name}} PRIVATE /MP)
 endif()
 
-target_precompile_headers({{PLUGIN_NAME}} PRIVATE <QtWidgets/QtWidgets>
+target_precompile_headers({{plugin_name}} PRIVATE <QtWidgets/QtWidgets>
         <QtWidgets/QUiPlugin>)
-
-

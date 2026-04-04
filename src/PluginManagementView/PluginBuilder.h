@@ -1,33 +1,33 @@
-#ifndef PLUGINBUILDER_H
+﻿#ifndef PLUGINBUILDER_H
 #define PLUGINBUILDER_H
 
-#include <QDir>
-#include <QFileDialog>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QProgressBar>
+#include <QPlainTextEdit>
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QLineEdit>
-#include <QMessageBox>
-#include <QPlainTextEdit>
-#include <QProgressBar>
-#include <QPushButton>
 #include <QVBoxLayout>
-#include <QWidget>
+#include <QMessageBox>
+#include <QFileDialog>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QDateTime>
+#include <QDir>
+#include <QProcess>
+#include <QVariantMap>
+#include <QJsonObject>
 
 struct PathSelector
-    : public QWidget
+    :QWidget
 {
     Q_OBJECT
-
 public:
     explicit PathSelector(QWidget *parent = nullptr);
-
-    [[nodiscard]] QString path() const
-    {
-        return QDir::fromNativeSeparators(edit->text().trimmed());
-    }
+    [[nodiscard]] QString path() const{return QDir::fromNativeSeparators(edit->text().trimmed());}
 
     template<class... PathSelectors, bool... directory>
-    static void _connect_signals(std::integer_sequence<bool, directory...>, PathSelectors *... selectors)
+    static void _connect_signals(std::integer_sequence<bool, directory...>, PathSelectors*... selectors)
     {
         (
             QObject::connect(
@@ -48,49 +48,78 @@ public:
             ...);
     }
 
-    QLineEdit *edit = nullptr;
-    QPushButton *browse = nullptr;
+    QLineEdit *edit;
+    QPushButton*browse;
 };
 
 class PluginBuilderPalette
     : public QWidget
 {
     Q_OBJECT
-
 public:
     explicit PluginBuilderPalette(QWidget *parent = nullptr);
 
 private slots:
+    /**
+     * @brief 在系统文件管理器中打开当前输出目录。
+     */
     void on_open_output_dir();
 
 private:
     void _setup_ui();
-    void _connect_signals();
     void append_log(const QString &log){    m_log_edit->appendPlainText(log);}
     bool build();
     bool _execute_cmake(const QString &cmd,const QStringList &args,const QString &working_dir);
     void set_last_error(const QString &error);
 
-    template<class...String,std::enable_if_t<(std::is_same_v<std::decay_t<String>, QString> && ...),int> = 0>
-    bool _validate_paths(const String&... paths)
+
+
+
+    void _connect_signals()
     {
-        return (... && [this](const QString& path)
-        {
-            if (QDir().mkpath(path))
-                return true;
-            set_last_error(path);
-            return false;
-        }(paths));
+        connect(m_build,&QPushButton::clicked,this, [this]{
+    m_log_edit->clear();
+    m_progress->setValue(0);
+    m_open_dir->setEnabled(false);
+
+    if (execute_build(false))
+    {
+        m_open_dir->setEnabled(true);
+        QMessageBox::information(this, "Success", "Build finished!");
+        on_open_output_dir();
+    }
+    else
+        QMessageBox::critical(this, "Error", m_last_error);
+});
+
+        connect(m_clean_build, &QPushButton::clicked, this, [this]{
+            m_log_edit->clear();
+            m_progress->setValue(0);
+            m_open_dir->setEnabled(false);
+
+            if (execute_build(true))
+            {
+                m_open_dir->setEnabled(true);
+                QMessageBox::information(this, "Success", "Clean rebuild finished!");
+                on_open_output_dir();
+            }
+            else
+                QMessageBox::critical(this, "Error", m_last_error);
+        });
+
+        PathSelector::_connect_signals(std::integer_sequence<bool,true>{}, m_path_source);
     }
 
-    PathSelector *m_path_source = nullptr;
-    QPushButton *m_build = nullptr;
-    QPushButton *m_clean_build = nullptr;
-    QProgressBar *m_progress = nullptr;
-    QPlainTextEdit *m_log_edit = nullptr;
+    QHBoxLayout *m_layout;
+    PathSelector *m_path_source;
+    QPushButton   *m_build;
+    QPushButton   *m_clean_build;
+    QPushButton   *m_open_dir;
+    QProgressBar *m_progress;
+    QPlainTextEdit* m_log_edit;
 
     QString m_last_error;
-    QString m_sandbox_dir;//插件的构建沙箱环境
+    QString m_sandbox_dir;
 };
 
 class PluginBuilder

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION {{CMAKE_MINIMUM_REQUIRED_VERSION}})
 
-project({{PLUGIN_NAME}} LANGUAGES CXX)
+project({{PLUGIN_NAME}}Generator LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -40,6 +40,6 @@ if(MSVC)
 endif()
 
 target_precompile_headers({{PLUGIN_NAME}} PRIVATE <QtWidgets/QtWidgets>
-        <QUiPlugin>)
+        <QtWidgets/QUiPlugin>)
 
 

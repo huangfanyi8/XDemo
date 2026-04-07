@@ -52,13 +52,13 @@ public:
     QPushButton *browse = nullptr;
 };
 
-class PluginBuilderView
+class PluginBuilderPalette
     : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit PluginBuilderView(QWidget *parent = nullptr);
+    explicit PluginBuilderPalette(QWidget *parent = nullptr);
 
 private slots:
     void on_open_output_dir();
@@ -69,7 +69,6 @@ private:
     void append_log(const QString &log){    m_log_edit->appendPlainText(log);}
     bool build();
     bool _execute_cmake(const QString &cmd,const QStringList &args,const QString &working_dir);
-    QString find_vcvars64() const;
     void set_last_error(const QString &error);
 
     template<class...String,std::enable_if_t<(std::is_same_v<std::decay_t<String>, QString> && ...),int> = 0>
@@ -92,6 +91,11 @@ private:
 
     QString m_last_error;
     QString m_sandbox_dir;//插件的构建沙箱环境
+};
+
+class PluginBuilder
+{
+
 };
 
 #endif // PLUGINBUILDER_H

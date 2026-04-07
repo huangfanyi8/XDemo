@@ -1,7 +1,6 @@
 #include "PluginBuilder.h"
 
 #include "../TemplateRenderer/TemplateRenderer.h"
-#include "../TemplateRenderer/TextEncodingHelper.h"
 #include "configure_info.h"
 
 #include <QDesktopServices>
@@ -18,14 +17,14 @@
 
 namespace
 {
-
+/**@brief  描述插件的元数据信息，根据需求自行扩展*/
 struct PluginMetadata
 {
-    QString plugin_name;
-    QString plugin_version;
-    QString class_name;
-    QString display_name;
-    QString description;
+    QString plugin_name{};///插件的名字
+    QString plugin_version{};///插件的版本
+    QString class_name{};///插件实现的类名
+    QString display_name{};///显示的名字
+    QString description{};///描述信息
 };
 
 bool load_metadata(const QString &metadata_file_path,PluginMetadata &metadata,QString &error_message)
@@ -54,14 +53,15 @@ bool load_metadata(const QString &metadata_file_path,PluginMetadata &metadata,QS
 
     const QJsonObject object = doc.object();
 
-    metadata.plugin_name = object.value("name").toString().trimmed();
-    metadata.plugin_version = object.value("version").toString().trimmed();
+    metadata.plugin_name = object.value("plugin_name").toString().trimmed();
+    metadata.plugin_version = object.value("plugin_version").toString().trimmed();
     metadata.class_name = object.value("class_name").toString().trimmed();
     metadata.display_name =
         object.value("display_name").toString(metadata.plugin_name).trimmed();
     metadata.description =
         object.value("description").toString("No description").trimmed();
 
+    //根据需求来手动设置
     if (metadata.plugin_name.isEmpty()
         || metadata.plugin_version.isEmpty()
         || metadata.class_name.isEmpty())
@@ -88,7 +88,7 @@ PathSelector::PathSelector(QWidget *parent)
     layout->addWidget(browse);
 }
 
-PluginBuilderView::PluginBuilderView(QWidget *parent)
+PluginBuilderPalette::PluginBuilderPalette(QWidget *parent)
     : QWidget(parent)
 {
     _setup_ui();
@@ -97,7 +97,7 @@ PluginBuilderView::PluginBuilderView(QWidget *parent)
     _connect_signals();
 }
 
-void PluginBuilderView::_setup_ui()
+void PluginBuilderPalette::_setup_ui()
 {
     auto *main_layout = new QVBoxLayout(this);
     auto *form = new QFormLayout();
@@ -124,7 +124,7 @@ void PluginBuilderView::_setup_ui()
     main_layout->addWidget(m_log_edit);
 }
 
-void PluginBuilderView::set_last_error(const QString &error)
+void PluginBuilderPalette::set_last_error(const QString &error)
 {
     if (!error.isEmpty())
     {
@@ -133,7 +133,7 @@ void PluginBuilderView::set_last_error(const QString &error)
     }
 }
 
-void PluginBuilderView::_connect_signals()
+void PluginBuilderPalette::_connect_signals()
 {
     auto trigger_build = [this](const QString &success_message)
     {
@@ -159,7 +159,7 @@ void PluginBuilderView::_connect_signals()
     PathSelector::_connect_signals(std::integer_sequence<bool, true>{}, m_path_source);
 }
 
-bool PluginBuilderView::_execute_cmake(const QString &cmake,
+bool PluginBuilderPalette::_execute_cmake(const QString &cmake,
                                     const QStringList &args,
                                     const QString &working_dir)
 {
@@ -181,43 +181,12 @@ bool PluginBuilderView::_execute_cmake(const QString &cmake,
         return false;
     }
 
-    const QString standard_output =
-        DongDong::TextEncodingHelper::decode_process_output(process.readAllStandardOutput());
-    const QString standard_error =
-        DongDong::TextEncodingHelper::decode_process_output(process.readAllStandardError());
 
-    if (!standard_output.isEmpty())
-    {
-        append_log(standard_output);
-    }
-
-    if (!standard_error.isEmpty())
-    {
-        append_log(standard_error);
-    }
-
-    if (process.exitCode() != 0)
-    {
-        if (!standard_error.trimmed().isEmpty())
-        {
-            set_last_error(standard_error.trimmed());
-        }
-        else if (!standard_output.trimmed().isEmpty())
-        {
-            set_last_error(standard_output.trimmed());
-        }
-        else
-        {
-            set_last_error(QString("Process exited with code %1.").arg(process.exitCode()));
-        }
-
-        return false;
-    }
 
     return true;
 }
 
-bool PluginBuilderView::build()
+bool PluginBuilderPalette::build()
 {
     set_last_error({});
 
@@ -230,8 +199,7 @@ bool PluginBuilderView::build()
     const QString qt_prefix_path =
         QDir::fromNativeSeparators(QString::fromUtf8(env_config::qt_prefix_path));
     const QString template_dir = QDir(project_root_dir).filePath("templates/plugin");
-    const bool use_msvc_environment =
-        qt_prefix_path.contains("msvc", Qt::CaseInsensitive);
+
     const QString source_dir = m_path_source->path();
 
     if (source_dir.isEmpty())
@@ -262,8 +230,7 @@ bool PluginBuilderView::build()
     const QString build_dir = m_sandbox_dir + "/build";
     const QString built_plugin_path = m_sandbox_dir + "/plugin/" + metadata.class_name + ".dll";
     const QString publish_dir = QDir(project_root_dir).filePath("plugins/"+ metadata.plugin_name+ "/"+ metadata.plugin_version);
-    const QString publish_path =
-        QDir(publish_dir).filePath(metadata.plugin_name+ "_"+ metadata.plugin_version+ ".dll");
+    const QString publish_path = QDir(publish_dir).filePath(metadata.plugin_name+ "_"+ metadata.plugin_version+ ".dll");
 
     this->_validate_paths(m_sandbox_dir,build_dir,publish_dir);
 
@@ -271,33 +238,15 @@ bool PluginBuilderView::build()
     append_log("Build directory: " + QDir::toNativeSeparators(build_dir));
 
     DongDong::TemplateRenderer renderer;
-    DongDong::TemplateRenderer::PluginTemplateContext template_context;
-    template_context.class_name = DongDong::TextEncodingHelper::to_utf8_string(metadata.class_name);
-    template_context.plugin_name =
-        DongDong::TextEncodingHelper::normalize_template_value(metadata.plugin_name);
-    template_context.plugin_version =
-        DongDong::TextEncodingHelper::normalize_template_value(metadata.plugin_version);
-    template_context.label_text = DongDong::TextEncodingHelper::normalize_template_value(
-        DongDong::TextEncodingHelper::escape_cpp_u8_string_literal(
-            metadata.display_name + " - " + metadata.description));
+    auto context_data = kainjow::mustache::data{};
 
-    std::vector<std::filesystem::path> created_files;
-    m_progress->setValue(10);
-    if (!renderer.generate_plugin_files(
-            DongDong::TextEncodingHelper::to_filesystem_path(m_sandbox_dir),
-            DongDong::TextEncodingHelper::to_filesystem_path(template_dir),
-            DongDong::TextEncodingHelper::to_filesystem_path(metadata_file_path),
-            template_context,
-            &created_files))
-    {
-        set_last_error(QString::fromUtf8(renderer.get_error().c_str()));
-        return false;
-    }
-
-    for (const auto &created_file : created_files)
-    {
-        append_log("Created: "+ DongDong::TextEncodingHelper::from_filesystem_path(created_file));
-    }
+    context_data["plugin_name "] = metadata.plugin_name.toStdString();
+    context_data["class_name "] = metadata.class_name.toStdString();
+    context_data["plugin_name "] = metadata.plugin_name.toStdString();
+    context_data["plugin_version "] = metadata.plugin_version.toStdString();
+    context_data["return_type "] ="QWidget";
+    DongDong::Diagnostic *diagnostic=new DongDong::Diagnostic;;
+    renderer.render_to_directory(template_dir.toStdString(), m_sandbox_dir.toStdString(), context_data,diagnostic);
 
     m_progress->setValue(20);
     if (!_execute_cmake(cmake_exe,
@@ -334,7 +283,7 @@ bool PluginBuilderView::build()
     return true;
 }
 
-void PluginBuilderView::on_open_output_dir()
+void PluginBuilderPalette::on_open_output_dir()
 {
     if (!m_sandbox_dir.isEmpty())
     {

@@ -15,12 +15,12 @@ int main(int argc, char *argv[])
     auto *button = new QPushButton(QStringLiteral("打开插件构建器"), &w);
     button->move(120, 100);
 
-    QPointer<PluginBuilderView> builder_window;
+    QPointer<PluginBuilderPalette> builder_window;
 
     QObject::connect(button, &QPushButton::clicked, &w, [&]() {
         if (builder_window.isNull())
         {
-            builder_window = new PluginBuilderView;
+            builder_window = new PluginBuilderPalette;
             builder_window->setAttribute(Qt::WA_DeleteOnClose);
         }
 

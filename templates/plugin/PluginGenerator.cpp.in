@@ -1,0 +1,24 @@
+#include "PluginGenerator.h"
+
+
+{{class_name}}Plugin::{{class_name}}Plugin(QWidget *parent)
+    : QWidget(parent)
+{
+
+}
+
+QString {{class_name}}Plugin::name() const
+{
+    return "{{plugin_name}}";
+}
+
+QString {{class_name}}Plugin::version() const
+{
+    return "{{plugin_version}}";
+}
+
+
+{{return_type}}* {{class_name}}Plugin::create(QWidget *parent)
+{
+    return new {{return_type}}(parent);
+}

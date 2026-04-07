@@ -1,21 +1,18 @@
 #pragma once
-
+//在这里添加组件的基础类型
 #include "IRuntimeComponentPlugin.h"
 #include <QWidget>
 #include <QString>
-#include <QStringList>
 
-namespace {{namespace_name}}
-{
-class {{CLASS_NAME}}Plugin : public QWidget, public IRuntimeComponentPlugin
+class {{class_name}}Plugin : public QWidget, public IRuntimeComponentPlugin
 {
 Q_OBJECT
 Q_PLUGIN_METADATA(IID LOWCODE_RUNTIME_COMPONENT_PLUGIN_IID)
 Q_INTERFACES({{namespace_name}}::IRuntimeComponentPlugin)
 
 public:
-    explicit {{CLASS_NAME}}Plugin(QWidget *parent = nullptr);
-    ~{{CLASS_NAME}}() override = default;
+    explicit {{class_name}}Plugin(QWidget *parent = nullptr);
+    ~{{class_name}}() override = default;
 
     [[nodiscard]] QString name() const override;
     [[nodiscard]] QString version() const override;
@@ -23,6 +20,6 @@ public:
     {{return_type}}* create(QWidget *parent = nullptr) override;
 
 };
-}
+
 
 

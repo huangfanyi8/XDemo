@@ -145,21 +145,26 @@ function(generate_configure_info template_file)
         set(output_file "${template_dir}/${template_name}.h")
     endif()
 
-
     set(CMAKE_PATH "${CMAKE_COMMAND}")
-
+    set(GENERATOR"${CMAKE_GENERATOR}")
+    set(BUILD_TYPE "${CMAKE_BUILD_TYPE}")
     set(PROJECT_ROOT_PATH "${CMAKE_SOURCE_DIR}")
-
     set(QT_PATH "")
+    set(QT_PREFIX_PATH "")
 
     if(DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
         set(QT_PATH "${Qt6_DIR}")
     elseif(DEFINED Qt5_DIR AND NOT Qt5_DIR STREQUAL "")
         set(QT_PATH "${Qt5_DIR}")
     elseif(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
-        list(GET CMAKE_PREFIX_PATH 0 EXPORT_QT_PATH)
+        list(GET CMAKE_PREFIX_PATH 0 QT_PREFIX_PATH)
     endif()
 
+    if(NOT QT_PATH STREQUAL "")
+        cmake_path(GET QT_PATH PARENT_PATH _qt_tmp_1)
+        cmake_path(GET _qt_tmp_1 PARENT_PATH _qt_tmp_2)
+        cmake_path(GET _qt_tmp_2 PARENT_PATH QT_PREFIX_PATH)
+    endif()
     configure_file(
             "${template_file}"
             "${output_file}"

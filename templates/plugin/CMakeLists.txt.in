@@ -23,12 +23,20 @@ file(GLOB_RECURSE plugin_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
+file(GLOB_RECURSE nested_build_sources CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/*"
+)
+
+if(nested_build_sources)
+    list(REMOVE_ITEM plugin_sources ${nested_build_sources})
+endif()
+
 add_library({{plugin_name}} MODULE ${plugin_sources})
 
 set_target_properties({{plugin_name}} PROPERTIES
     PREFIX ""
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin/$<CONFIG>"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin/$<CONFIG>"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/plugin"
 )
 
 target_link_libraries({{plugin_name}} PRIVATE
@@ -39,5 +47,4 @@ if(MSVC)
     target_compile_options({{plugin_name}} PRIVATE /MP)
 endif()
 
-target_precompile_headers({{plugin_name}} PRIVATE <QtWidgets/QtWidgets>
-        <QtWidgets/QUiPlugin>)
+target_precompile_headers({{plugin_name}} PRIVATE <QtWidgets/QtWidgets>)

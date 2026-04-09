@@ -1,4 +1,5 @@
 #include "PluginBuilder.h"
+#include "PluginBuilder.h"
 
 #include "../TemplateRenderer/TemplateRenderer.h"
 #include "configure_info.h"
@@ -11,20 +12,21 @@
 #include <QJsonParseError>
 #include <QProcess>
 #include <QUrl>
-
+#include<QMessageBox>
 #include <filesystem>
 
 namespace
 {
-/**@brief  描述插件的元数据信息，根据需求自行扩展*/
-struct PluginMetadata
-{
-    QString plugin_name{};///插件的名字
-    QString plugin_version{};///插件的版本
-    QString class_name{};///插件实现的类名
-    QString display_name{};///显示的名字
-    QString description{};///描述信息
-};
+    /**@brief  描述插件的元数据信息，根据需求自行扩展*/
+    struct PluginMetadata
+    {
+        QString plugin_name{};///插件的名字
+        QString plugin_version{};///插件的版本
+        QString plugin_type{};///插件的类型
+        QString class_name{};///插件实现的类名
+        QString display_name{};///显示的名字
+        QString description{};///描述信息
+    };
 
 bool load_metadata(const QString &metadata_file_path,PluginMetadata &metadata,QString &error_message)
 {
@@ -54,6 +56,7 @@ bool load_metadata(const QString &metadata_file_path,PluginMetadata &metadata,QS
 
     metadata.plugin_name = object.value("plugin_name").toString().trimmed();
     metadata.plugin_version = object.value("plugin_version").toString().trimmed();
+    metadata.plugin_type = object.value("plugin_type").toString().trimmed();
     metadata.class_name = object.value("class_name").toString().trimmed();
     metadata.display_name =
         object.value("display_name").toString(metadata.plugin_name).trimmed();
@@ -71,6 +74,7 @@ bool load_metadata(const QString &metadata_file_path,PluginMetadata &metadata,QS
 
     return true;
 }
+
 
 } // namespace
 
@@ -143,7 +147,7 @@ void PluginBuilderPalette::_connect_signals()
         if (build())
         {
             QMessageBox::information(this, "Success", success_message);
-            on_open_output_dir();
+            on_open_sandbox_dir();
         }
     };
 
@@ -162,25 +166,44 @@ bool PluginBuilderPalette::_execute_cmake(const QString &cmake,
                                     const QStringList &args,
                                     const QString &working_dir)
 {
+    const QDir work_dir(working_dir);
+    if (!work_dir.exists())
+    {
+        QDir().mkpath(working_dir);
+        append_log("Created build directory: " + QDir::toNativeSeparators(working_dir));
+    }
+
     QProcess process;
     process.setWorkingDirectory(working_dir);
-
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    
     append_log("Working directory: " + QDir::toNativeSeparators(working_dir));
+    append_log("Executing: " + cmake + " " + args.join(" "));
 
     process.start(cmake, args);
+    
     if (!process.waitForStarted(5000))
     {
-        set_last_error("Failed to start CMake: " + cmake);
+        append_log("Failed to start. Error: " + process.errorString());
+        set_last_error("Failed to start CMake: " + process.errorString());
         return false;
     }
 
-    if (!process.waitForFinished(60000))
+    if (!process.waitForFinished(120000))
     {
-        set_last_error("Timeout");
+        set_last_error("CMake timeout");
         return false;
     }
 
+    const QString output = QString::fromUtf8(process.readAllStandardOutput());
+    append_log(output);
 
+    const int exit_code = process.exitCode();
+    if (exit_code != 0)
+    {
+        append_log("CMake failed with exit code: " + QString::number(exit_code));
+        return false;
+    }
 
     return true;
 }
@@ -190,16 +213,29 @@ bool PluginBuilderPalette::build()
     set_last_error({});
 
     const QString cmake_exe =
-        QDir::fromNativeSeparators(QString::fromUtf8(env_config::cmake_path));
-    const QString qt_package_dir =
-        QDir::fromNativeSeparators(QString::fromUtf8(env_config::qt_path));
-    const QString project_root_dir =
-        QDir::fromNativeSeparators(QString::fromUtf8(env_config::project_root_path));
-    const QString qt_prefix_path =
-        QDir::fromNativeSeparators(QString::fromUtf8(env_config::qt_prefix_path));
-    const QString template_dir = QDir(project_root_dir).filePath("templates/plugin");
+        QDir::cleanPath(QDir::fromNativeSeparators(QString::fromUtf8(env_config::cmake_path)));
 
+    const QString qt_package_dir =
+        QDir::cleanPath(QDir::fromNativeSeparators(QString::fromUtf8(env_config::qt_path)));
+
+    const QString project_root_dir =
+        QDir::cleanPath(QDir::fromNativeSeparators(QString::fromUtf8(env_config::project_root_path)));
+
+    const QString qt_prefix_path =
+        QDir::cleanPath(QDir::fromNativeSeparators(QString::fromUtf8(env_config::qt_prefix_path)));
+
+    const QString template_dir =
+        QDir::cleanPath(QDir(project_root_dir).filePath(QStringLiteral("templates/plugin")));
     const QString source_dir = m_path_source->path();
+
+    // 验证 cmake 是否存在
+    if (!QFileInfo::exists(cmake_exe))
+    {
+        set_last_error("CMake executable not found at: " + cmake_exe);
+        return false;
+    }
+
+
 
     if (source_dir.isEmpty())
     {
@@ -221,17 +257,19 @@ bool PluginBuilderPalette::build()
         return false;
     }
 
-    append_log("Source directory: " + QDir::toNativeSeparators(source_dir));
-    append_log("Metadata file: " + QDir::toNativeSeparators(metadata_file_path));
-    append_log(QString("Plugin: %1 (Version: %2, Class: %3)").arg(metadata.plugin_name, metadata.plugin_version, metadata.class_name));
+    append_log("Source directory: " + source_dir);
+    append_log("Metadata file: " + metadata_file_path);
+    append_log(QString("Plugin  metadata: %1 (Version: %2, Class: %3)").arg(metadata.plugin_name, metadata.plugin_version, metadata.class_name));
 
-    this->m_sandbox_dir = source_dir + "/build/" ;
-    const QString build_dir = m_sandbox_dir + "/build";
-    const QString built_plugin_path = m_sandbox_dir + "/plugin/" + metadata.class_name + ".dll";
-    const QString publish_dir = QDir(project_root_dir).filePath("plugins/"+ metadata.plugin_name+ "/"+ metadata.plugin_version);
-    const QString publish_path = QDir(publish_dir).filePath(metadata.plugin_name+ "_"+ metadata.plugin_version+ ".dll");
+    // 沙箱的路径
+    this->m_sandbox_dir = QDir(source_dir).filePath("build");
+    //构建插件的目录
+    const QString build_dir = QDir(m_sandbox_dir).filePath("build");
+    const QString publish_dir = QDir(project_root_dir).filePath("plugins/" + metadata.plugin_name + "/" + metadata.plugin_version);
+    const QString publish_path = QDir(publish_dir).filePath(metadata.plugin_name + "_" + metadata.plugin_version + ".dll");
+    const QString built_plugin_path = QDir(m_sandbox_dir).filePath(QString("plugin/")+env_config::cmake_build_type+ "/"+metadata.plugin_name + ".dll");
 
-    this->_validate_paths(m_sandbox_dir,build_dir,publish_dir);
+    //this->_validate_paths(m_sandbox_dir,build_dir,publish_dir);
 
     append_log("Output directory: " + QDir::toNativeSeparators(m_sandbox_dir));
     append_log("Build directory: " + QDir::toNativeSeparators(build_dir));
@@ -239,13 +277,25 @@ bool PluginBuilderPalette::build()
     DongDong::TemplateRenderer renderer;
     auto context_data = kainjow::mustache::data{};
 
-    context_data["plugin_name "] = metadata.plugin_name.toStdString();
-    context_data["class_name "] = metadata.class_name.toStdString();
-    context_data["plugin_name "] = metadata.plugin_name.toStdString();
-    context_data["plugin_version "] = metadata.plugin_version.toStdString();
-    context_data["return_type "] ="QWidget";
-    DongDong::Diagnostic *diagnostic=new DongDong::Diagnostic;;
-    renderer.render_to_directory(template_dir.toStdString(), m_sandbox_dir.toStdString(), context_data,diagnostic);
+    context_data["plugin_name"] = metadata.plugin_name.toStdString();
+    context_data["class_name"] = metadata.class_name.toStdString();
+    context_data["plugin_version"] = metadata.plugin_version.toStdString();
+    context_data["plugin_type"] = metadata.plugin_type.toStdString();
+    context_data["return_type"] = "QWidget";
+    context_data["cmake_minimum_required_version"] = "3.20"; // CMake 最低版本
+    context_data["export_format"] = "Q_DECL_EXPORT"; // DLL 导出宏
+    
+    DongDong::Diagnostic diagnostic;
+    if (!renderer.render_to_directory(template_dir.toStdString(), m_sandbox_dir.toStdString(), context_data, &diagnostic))
+    {
+        QString error_msg = "Template rendering failed:";
+        for (const auto& err : diagnostic.last_errors())
+        {
+            error_msg += "\n" + QString::fromStdString(err);
+        }
+        set_last_error(error_msg);
+        return false;
+    }
 
     m_progress->setValue(20);
     if (!_execute_cmake(cmake_exe,
@@ -259,21 +309,53 @@ bool PluginBuilderPalette::build()
             },
             build_dir))
     {
-        set_last_error("CMake configure failed: " );
+        set_last_error("CMake configure failed. Check the log for details.");
         return false;
     }
 
     m_progress->setValue(50);
-    if (!_execute_cmake(cmake_exe,{"--build", build_dir, "--config", "Release","--j 8"},build_dir))
+    if (!_execute_cmake(cmake_exe, {"--build", build_dir, "--config", "Release", "-j", "8"}, build_dir))
     {
-        set_last_error("CMake build failed: " );
+        set_last_error("CMake build failed. Check the log for details.");
         return false;
     }
 
 
-    if (!QFile::copy(built_plugin_path, publish_path))
+
+    if (!QFileInfo::exists(built_plugin_path))
     {
-        set_last_error("Failed to publish plugin DLL to: " + publish_path);
+        set_last_error("Built plugin DLL not found: " + built_plugin_path);
+        return false;
+    }
+
+    if (!QDir().mkpath(publish_dir))
+    {
+        set_last_error("Failed to create publish directory: " + publish_dir);
+        return false;
+    }
+
+    append_log("Built plugin path: " + QDir::toNativeSeparators(built_plugin_path));
+    append_log("Publish path: " + QDir::toNativeSeparators(publish_path));
+
+    QFile publish_file(publish_path);
+    if (QFileInfo::exists(publish_path) && !publish_file.remove())
+    {
+        set_last_error("Failed to replace existing published plugin DLL: "
+                       + publish_path
+                       + ". Error: "
+                       + publish_file.errorString());
+        return false;
+    }
+
+    QFile built_plugin_file(built_plugin_path);
+    if (!built_plugin_file.copy(publish_path))
+    {
+        set_last_error("Failed to copy plugin DLL from "
+                       + built_plugin_path
+                       + " to "
+                       + publish_path
+                       + ". Error: "
+                       + built_plugin_file.errorString());
         return false;
     }
 
@@ -282,7 +364,7 @@ bool PluginBuilderPalette::build()
     return true;
 }
 
-void PluginBuilderPalette::on_open_output_dir()
+void PluginBuilderPalette::on_open_sandbox_dir()
 {
     if (!m_sandbox_dir.isEmpty())
     {

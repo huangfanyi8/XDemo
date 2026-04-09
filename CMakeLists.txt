@@ -55,25 +55,35 @@ endfunction()
 
 #指定相关的源代码，添加测试函数
 function(add_test_func  main_src)
-    cmake_parse_arguments(DONG_DONG "" "QRC" "SOURCE_DIR;MODULES" ${ARGN})
-    get_filename_component(target_name ${main_src} NAME_WE )
-    file(GLOB_RECURSE source_files
-            CONFIGURE_DEPENDS
-            "${DONG_DONG_SOURCE_DIR}/*.cpp"
-            "${DONG_DONG_SOURCE_DIR}/*.c"
-            "${DONG_DONG_SOURCE_DIR}/*.h"
-            "${DONG_DONG_SOURCE_DIR}/*.hpp"
-            "${DONG_DONG_SOURCE_DIR}/*.ui"
-            "${DONG_DONG_SOURCE_DIR}/*.qrc"
-    )
+    cmake_parse_arguments(DONG_DONG "" "QRC;EXE_NAME" "SOURCE_DIR;MODULES" ${ARGN})
+    if(DEFINED DONG_DONG_EXE_NAME)
+        set(target_name ${DONG_DONG_EXE_NAME}  )
+    else ()
+        get_filename_component(target_name ${main_src} NAME_WE )
+    ENDIF ()
+    set(source_files "")
+    foreach(dir IN LISTS DONG_DONG_SOURCE_DIR)
+        file(GLOB_RECURSE dir_files
+                CONFIGURE_DEPENDS
+                "${dir}/*.cpp"
+                "${dir}/*.c"
+                "${dir}/*.h"
+                "${dir}/*.hpp"
+                "${dir}/*.ui"
+                "${dir}/*.qrc"
+        )
+        list(APPEND source_files ${dir_files})
+    endforeach()
     set(all_sources ${main_src} ${source_files})
-    if(ARG_QRC)
+    if(DONG_DONG_QRC)
         list(APPEND all_sources ${ARG_QRC})
     endif()
     add_executable(${target_name}  ${all_sources})
 
     target_include_directories(${target_name} PUBLIC ${DONG_DONG_SOURCE_DIR})
-
+    target_include_directories(${target_name} PRIVATE
+            "${CMAKE_SOURCE_DIR}/configure/$<CONFIG>"
+    )
     message("add target  : ${target_name}")
     message("add sources  : ${all_sources}")
 
@@ -106,48 +116,15 @@ add_test_func(test/NodeEditor.cpp
         SOURCE_DIR  ${CMAKE_SOURCE_DIR}/src/NodeEditor
         MODULES Qt${QT_VERSION_MAJOR}::Widgets)
 
-
 add_test_func(test/PluginManagementView.cpp
-        SOURCE_DIR    ${CMAKE_SOURCE_DIR}/src/PluginManagementView
-        MODULES  Qt${QT_VERSION_MAJOR}::Widgets  Qt${QT_VERSION_MAJOR}::UiPlugin)
-
-# TemplateRenderer 测试（可执行文件命名为 TestTemplateRenderer 避免与库冲突）
-add_executable(TestTemplateRenderer
-        test/TemplateRenderer.cpp
-        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.cpp
-        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer/TemplateRenderer.h
-)
-target_include_directories(TestTemplateRenderer PUBLIC ${CMAKE_SOURCE_DIR}/src/TemplateRenderer)
-target_link_libraries(TestTemplateRenderer PRIVATE TemplateRenderer)
-set_target_properties(TestTemplateRenderer PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/bin/$<CONFIG>"
-)
+        SOURCE_DIR  ${CMAKE_SOURCE_DIR}/src/PluginManagementView
+        ${CMAKE_SOURCE_DIR}/src/TemplateRenderer
+        MODULES Qt${QT_VERSION_MAJOR}::Widgets)
 
 
-function(generate_configure_info template_file)
-    # ========== 解析可选参数 ==========
-    cmake_parse_arguments(
-            CFG
-            ""
-            "OUTPUT"
-            ""
-            ${ARGN}
-    )
-
-    get_filename_component(template_name "${template_file}" NAME_WE)
-    if(DEFINED CFG_OUTPUT AND NOT CFG_OUTPUT STREQUAL "")
-        # 用户指定了输出路径
-        set(output_file "${CFG_OUTPUT}/${template_name}.h")
-    else()
-        # 默认
-        get_filename_component(template_dir "${template_file}" DIRECTORY)
-
-        set(output_file "${template_dir}/${template_name}.h")
-    endif()
-
+function(generate_configure_info output_dir)
     set(CMAKE_PATH "${CMAKE_COMMAND}")
-    set(GENERATOR"${CMAKE_GENERATOR}")
-    set(BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+    set(GENERATOR_TYPE "${CMAKE_GENERATOR}")
     set(PROJECT_ROOT_PATH "${CMAKE_SOURCE_DIR}")
     set(QT_PATH "")
     set(QT_PREFIX_PATH "")
@@ -165,18 +142,30 @@ function(generate_configure_info template_file)
         cmake_path(GET _qt_tmp_1 PARENT_PATH _qt_tmp_2)
         cmake_path(GET _qt_tmp_2 PARENT_PATH QT_PREFIX_PATH)
     endif()
-    configure_file(
-            "${template_file}"
-            "${output_file}"
-            @ONLY
-    )
 
+    set(_content [=[
+#pragma once
+namespace env_config
+{
+    inline constexpr auto qt_path = "@QT_PATH@";
+    inline constexpr auto cmake_path = "@CMAKE_PATH@";
+    inline constexpr auto project_root_path = "@PROJECT_ROOT_PATH@";
+    inline constexpr auto qt_prefix_path = "@QT_PREFIX_PATH@";
+    inline constexpr auto cmake_generator = "@GENERATOR_TYPE@";
+    inline constexpr auto cmake_build_type = "$<CONFIG>";
+}
+]=])
+
+    string(CONFIGURE "${_content}" _content @ONLY)
+
+    file(GENERATE
+            OUTPUT "${output_dir}/$<CONFIG>/configure_info.h"
+            CONTENT "${_content}"
+    )
 endfunction()
 
-generate_configure_info(${CMAKE_SOURCE_DIR}/templates/plugin/configure_info.h.in
-        OUTPUT ${CMAKE_SOURCE_DIR}/plugins
-)
-target_include_directories(PluginManagementView  PRIVATE ${CMAKE_SOURCE_DIR}/plugins)
+generate_configure_info( ${CMAKE_SOURCE_DIR}/configure)
+
 function(add_lib  lib_name)
     cmake_parse_arguments(LIB "" "SOURCE_DIR"  "MODULES"   ${ARGN})
     file(GLOB_RECURSE LIB_SOURCES

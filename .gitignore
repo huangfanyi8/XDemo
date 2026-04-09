@@ -3,4 +3,5 @@ cmake-build-debug
 cmake-build-release
 .idea
 TestPlugin
-plugins/configure_info.h
+configure
+plugins

@@ -12,11 +12,12 @@ Q_INTERFACES(IRuntimeComponentPlugin)
 
 public:
     explicit {{class_name}}Plugin(QWidget *parent = nullptr);
-    ~{{class_name}}() override = default;
+    ~{{class_name}}Plugin() override = default;
 
     [[nodiscard]] QString name() const override;
     [[nodiscard]] QString version() const override;
+    [[nodiscard]] QString type() const override;
 
-    {{return_type}}* create(QWidget *parent = nullptr) override;
+    {{return_type}}* create(const QString& type, QObject* parent = nullptr) override;
 
 };

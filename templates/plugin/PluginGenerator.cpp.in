@@ -17,8 +17,12 @@ QString {{class_name}}Plugin::version() const
     return "{{plugin_version}}";
 }
 
-
-{{return_type}}* {{class_name}}Plugin::create(QWidget *parent)
+QString {{class_name}}Plugin::type() const
 {
-    return new {{return_type}}(parent);
+    return "{{plugin_type}}";
+}
+
+{{return_type}}* {{class_name}}Plugin::create(const QString &type, QObject* parent)
+{
+    return new {{return_type}}(qobject_cast<QWidget*>(parent));
 }

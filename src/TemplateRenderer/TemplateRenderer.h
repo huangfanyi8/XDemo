@@ -23,9 +23,17 @@ namespace DongDong
 
     struct Diagnostic
     {
-        void info(const std::string& message){}
-        void warning(const std::string& message){}
-        void error(const std::string& message){}
+        void info(const std::string& message) { m_info_messages.push_back(message); }
+        void warning(const std::string& message) { m_warning_messages.push_back(message); }
+        void error(const std::string& message) { m_error_messages.push_back(message); }
+        
+        [[nodiscard]] const std::vector<std::string>& last_errors() const { return m_error_messages; }
+        [[nodiscard]] bool has_errors() const { return !m_error_messages.empty(); }
+        
+    private:
+        std::vector<std::string> m_info_messages;
+        std::vector<std::string> m_warning_messages;
+        std::vector<std::string> m_error_messages;
     };
 
     class TemplateRenderer

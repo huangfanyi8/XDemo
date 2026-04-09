@@ -33,88 +33,60 @@ namespace DongDong
         return true;
     }
 
-    bool TemplateRenderer::render_to_directory(const std::filesystem::path& input_file_path,
-                                               const std::filesystem::path& output_file_path,
-                                               const mustache::data& context,
-                                               Diagnostic* diagnostic) const
+bool TemplateRenderer::render_to_directory(const std::filesystem::path& input_dir,
+                                           const std::filesystem::path& output_dir,
+                                           const mustache::data& context,
+                                           Diagnostic* diagnostic) const
+{
+    // 输入必须是目录
+    if (!std::filesystem::exists(input_dir) || !std::filesystem::is_directory(input_dir))
     {
-        const std::filesystem::path& input_dir = input_file_path;
-        const std::filesystem::path& output_dir = output_file_path;
-
-        try
-        {
-            if (!std::filesystem::exists(input_dir))
-            {
-                if (diagnostic)
-                {
-                    diagnostic->error("input directory does not exist: " + input_dir.string());
-                }
-                return false;
-            }
-
-            if (!std::filesystem::is_directory(input_dir))
-            {
-                if (diagnostic)
-                {
-                    diagnostic->error("input path is not a directory: " + input_dir.string());
-                }
-                return false;
-            }
-
-            std::filesystem::create_directories(output_dir);
-
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(input_dir))
-            {
-                if (!entry.is_regular_file())
-                {
-                    continue;
-                }
-
-                const std::filesystem::path current_input_file = entry.path();
-                const std::filesystem::path relative_path = std::filesystem::relative(current_input_file, input_dir);
-
-                std::filesystem::path current_output_file = output_dir / relative_path;
-
-                if (current_output_file.extension() == ".mustache")
-                {
-                    current_output_file.replace_extension();
-                }
-
-                const std::filesystem::path parent_dir = current_output_file.parent_path();
-                if (!parent_dir.empty())
-                {
-                    std::filesystem::create_directories(parent_dir);
-                }
-
-                if (!render_to(current_input_file, current_output_file, context, diagnostic))
-                {
-                    if (diagnostic)
-                    {
-                        diagnostic->error("failed to render file: " + current_input_file.string());
-                    }
-                    return false;
-                }
-            }
-
-            return true;
-        }
-        catch (const std::exception& e)
-        {
-            if (diagnostic)
-            {
-                diagnostic->error(std::string("failed to render directory: ") + e.what());
-            }
-            return false;
-        }
-        catch (...)
-        {
-            if (diagnostic)
-            {
-                diagnostic->error("failed to render directory: unknown error");
-            }
-            return false;
-        }
+        if (diagnostic) diagnostic->error("input directory does not exist or is not a directory: " + input_dir.string());
+        return false;
     }
+
+    // 输出若已存在，必须是目录
+    if (std::filesystem::exists(output_dir) && !std::filesystem::is_directory(output_dir))
+    {
+        if (diagnostic) diagnostic->error("output path must be a directory: " + output_dir.string());
+        return false;
+    }
+
+    try
+    {
+        std::filesystem::create_directories(output_dir);
+
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(input_dir))
+        {
+            if (!entry.is_regular_file()) continue;
+
+            const std::filesystem::path in_file   = entry.path();
+            const std::filesystem::path rel_path = std::filesystem::relative(in_file, input_dir);
+            std::filesystem::path out_file = output_dir / rel_path;
+
+            // ---- 关键修改点：循环去除所有 .in ----
+            while (out_file.extension() == ".in")
+                out_file.replace_extension();
+            // -----------------------------------------
+
+            // 确保父目录存在
+            std::filesystem::create_directories(out_file.parent_path());
+
+            if (!render_to(in_file, out_file, context, diagnostic))
+            {
+                if (diagnostic) diagnostic->error("failed to render file: " + in_file.string());
+                return false;
+            }
+        }
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        if (diagnostic) diagnostic->error(std::string("failed to render directory: ") + e.what());
+        return false;
+    }
+}
+
 
     bool TemplateRenderer::_read(const std::filesystem::path& file_path,
                                  std::string& out_text,

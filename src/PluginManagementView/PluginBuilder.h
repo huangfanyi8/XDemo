@@ -7,16 +7,12 @@
 #include <QPlainTextEdit>
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QMessageBox>
 #include <QFileDialog>
 #include <QDesktopServices>
-#include <QUrl>
-#include <QDateTime>
 #include <QDir>
 #include <QProcess>
-#include <QVariantMap>
 #include <QJsonObject>
+
 
 struct PathSelector
     :QWidget
@@ -63,53 +59,16 @@ private slots:
     /**
      * @brief 在系统文件管理器中打开当前输出目录。
      */
-    void on_open_output_dir();
+    void on_open_sandbox_dir();
 
 private:
     void _setup_ui();
-    void append_log(const QString &log){    m_log_edit->appendPlainText(log);}
+    void append_log(const QString &log){    m_log_edit->appendPlainText(QDir::toNativeSeparators(log));}
     bool build();
     bool _execute_cmake(const QString &cmd,const QStringList &args,const QString &working_dir);
     void set_last_error(const QString &error);
 
-
-
-
-    void _connect_signals()
-    {
-        connect(m_build,&QPushButton::clicked,this, [this]{
-    m_log_edit->clear();
-    m_progress->setValue(0);
-    m_open_dir->setEnabled(false);
-
-    if (execute_build(false))
-    {
-        m_open_dir->setEnabled(true);
-        QMessageBox::information(this, "Success", "Build finished!");
-        on_open_output_dir();
-    }
-    else
-        QMessageBox::critical(this, "Error", m_last_error);
-});
-
-        connect(m_clean_build, &QPushButton::clicked, this, [this]{
-            m_log_edit->clear();
-            m_progress->setValue(0);
-            m_open_dir->setEnabled(false);
-
-            if (execute_build(true))
-            {
-                m_open_dir->setEnabled(true);
-                QMessageBox::information(this, "Success", "Clean rebuild finished!");
-                on_open_output_dir();
-            }
-            else
-                QMessageBox::critical(this, "Error", m_last_error);
-        });
-
-        PathSelector::_connect_signals(std::integer_sequence<bool,true>{}, m_path_source);
-    }
-
+    void _connect_signals();
     QHBoxLayout *m_layout;
     PathSelector *m_path_source;
     QPushButton   *m_build;
@@ -122,9 +81,6 @@ private:
     QString m_sandbox_dir;
 };
 
-class PluginBuilder
-{
 
-};
 
 #endif // PLUGINBUILDER_H
